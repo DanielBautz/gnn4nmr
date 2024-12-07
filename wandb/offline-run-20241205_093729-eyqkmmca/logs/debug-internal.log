@@ -1,0 +1,10 @@
+{"time":"2024-12-05T09:37:29.1779086+01:00","level":"INFO","msg":"using version","core version":"0.18.7"}
+{"time":"2024-12-05T09:37:29.1779086+01:00","level":"INFO","msg":"created symlink","path":"C:\\Uni\\Thesis\\gnn4nmr\\wandb\\offline-run-20241205_093729-eyqkmmca\\logs\\debug-core.log"}
+{"time":"2024-12-05T09:37:29.2920689+01:00","level":"INFO","msg":"created new stream","id":"eyqkmmca"}
+{"time":"2024-12-05T09:37:29.2926077+01:00","level":"INFO","msg":"stream: started","id":"eyqkmmca"}
+{"time":"2024-12-05T09:37:29.2926077+01:00","level":"INFO","msg":"writer: Do: started","stream_id":"eyqkmmca"}
+{"time":"2024-12-05T09:37:29.2926077+01:00","level":"INFO","msg":"handler: started","stream_id":"eyqkmmca"}
+{"time":"2024-12-05T09:37:29.2926077+01:00","level":"INFO","msg":"sender: started","stream_id":"eyqkmmca"}
+{"time":"2024-12-05T09:37:29.322612+01:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2024-12-05T09:37:39.3354003+01:00","level":"ERROR","msg":"monitor: cpu: error sampling metrics: couldn't find pid: 4408"}
+{"time":"2024-12-05T09:39:29.3234264+01:00","level":"ERROR","msg":"monitor: memory: error sampling metrics: Falscher Parameter."}

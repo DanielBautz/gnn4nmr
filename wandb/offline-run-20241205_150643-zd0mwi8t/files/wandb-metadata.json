@@ -1,0 +1,31 @@
+{
+  "os": "Windows-10-10.0.19045-SP0",
+  "python": "3.10.15",
+  "startedAt": "2024-12-05T14:06:43.155071Z",
+  "program": "c:\\Uni\\Thesis\\gnn4nmr\\src\\main.py",
+  "codePath": "src\\main.py",
+  "git": {
+    "remote": "https://github.com/DanielBautz/gnn4nmr.git",
+    "commit": "26eab51acf82e397e2c1c08523405617a29de67c"
+  },
+  "root": ".",
+  "host": "DESKTOP-RT7NDAE",
+  "username": "Daniel",
+  "executable": "C:\\Users\\Daniel\\anaconda3\\envs\\gnn4nmr\\python.exe",
+  "codePathLocal": "src\\main.py",
+  "cpu_count": 6,
+  "cpu_count_logical": 12,
+  "disk": {
+    "/": {
+      "total": "511396532224",
+      "used": "170071904256"
+    }
+  },
+  "memory": {
+    "total": "16412246016"
+  },
+  "cpu": {
+    "count": 6,
+    "countLogical": 12
+  }
+}

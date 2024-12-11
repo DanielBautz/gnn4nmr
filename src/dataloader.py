@@ -9,8 +9,8 @@ def nx_to_pyg_data(nx_graph):
     edge_index = []
     edge_features = []
     target = []
-    valid_node_indices = []
 
+    # extrahiere Knoten-Features und Zielwerte
     for node, data in nx_graph.nodes(data=True):
         feature = [
             data.get('atomic_num', 0), data.get('degree', 0), data.get('shielding_dia', 0), data.get('shielding_para', 0),
@@ -22,12 +22,10 @@ def nx_to_pyg_data(nx_graph):
         ]
         node_features.append(feature)
 
-        if data.get('atomic_num') == 6:
-            target.append(data.get('shift_high-low', 0.0))
-            valid_node_indices.append(node)
-        else:
-            target.append(float('nan'))
+        # Zielwerte (nur Kohlenstoffatome relevant)
+        target.append(data.get('shift_high-low', 0.0) if data.get('atomic_num') == 6 else float('nan'))
 
+    # extrahiere Kanten
     for source, target, data in nx_graph.edges(data=True):
         edge_index.append([source, target])
         edge_feature = [

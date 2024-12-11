@@ -1,8 +1,7 @@
-import pytorch_lightning as pl
+from .model import GNNModel
+from .dataloader import get_data_loaders
 from pytorch_lightning.loggers import WandbLogger
-from model import GNNModel
-from dataloader import get_data_loaders
-import wandb
+import pytorch_lightning as pl
 
 def train_model(data_path, input_dim=15, hidden_dim=32, output_dim=1, max_epochs=50):
     wandb_logger = WandbLogger(project="gnn_shift_prediction")

@@ -1,5 +1,3 @@
-# playground.py
-
 import argparse
 from tools import load_graphs, analyze_graph, convert_xyz_to_sdf
 

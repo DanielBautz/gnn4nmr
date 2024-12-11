@@ -1,3 +1,8 @@
+#folders
 wandb/
+old code/
 __pycache__/
+
+#files
 __init__.py 
+

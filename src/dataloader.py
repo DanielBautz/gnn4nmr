@@ -33,9 +33,9 @@ class MoleculeDataset(InMemoryDataset):
         """ Konvertiert einen NetworkX-Graphen G in ein PyG Data-Objekt,
             wobei alle relevanten Features berücksichtigt werden. """
 
-        # Definiere eine geordnete Liste aller Features, die im Feature-Vektor x landen sollen.
-        # 'shift_high-low' behandeln wir als Target y (wird also NICHT in x gespeichert).
-        # Die Position pos zerlegen wir in pos_x, pos_y, pos_z.
+        # geordnete Liste aller Features, die im Feature-Vektor x landen sollen.
+        # 'shift_high-low' als Target y
+        # pos wird zerlegt in pos_x, pos_y, pos_z
         ALL_FEATURES = [
             "element_id",       # numerische Kodierung: C=0, H=1, other=2
             "atom_idx",
@@ -44,7 +44,7 @@ class MoleculeDataset(InMemoryDataset):
             "formal_charge",
             "degree",
 
-            # Sowohl C als auch H (und ggf. sonstige) haben evtl. shift_low
+            # Sowohl C als auch H haben shift_low
             "shift_low",
             "CN(X)",
 
@@ -111,9 +111,8 @@ class MoleculeDataset(InMemoryDataset):
 
             # Baue Feature-Vektor x für diesen Knoten
             x_vec = []
-            # Wir legen Key-Value Paare in einem dictionary an, damit wir einfach
-            # nachschauen können, ob ein Feature da ist. Fehlendes wird 0.
-            # pos behandeln wir separat in pos_x, pos_y, pos_z
+            # Key-Value Paare in einem dictionary, um einfach nachzuschauen, ob ein Feature da ist. Sonst 0. 
+            # pos separat in pos_x, pos_y, pos_z
             fdict = {}
 
             # element_id

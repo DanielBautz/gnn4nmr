@@ -78,9 +78,9 @@ def test(model, loader, device):
     avg_mae = running_mae / total_nodes
     return avg_mse, avg_mae
 
-def run_training(model, train_loader, val_loader, test_loader, epochs, device):
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    
+def run_training(model, train_loader, val_loader, test_loader, epochs, device, lr):
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
     for epoch in range(1, epochs+1):
         train_mse, train_mae = train(model, train_loader, optimizer, device)
         val_mse, val_mae = test(model, val_loader, device)
@@ -91,11 +91,9 @@ def run_training(model, train_loader, val_loader, test_loader, epochs, device):
             "val_mse": val_mse,
             "val_mae": val_mae
         })
-        print(f"Epoch: {epoch}, Train MSE: {train_mse:.4f}, Train MAE: {train_mae:.4f}, Val MSE: {val_mse:.4f}, Val MAE: {val_mae:.4f}")
 
     test_mse, test_mae = test(model, test_loader, device)
     wandb.log({
         "test_mse": test_mse,
         "test_mae": test_mae
     })
-    print(f"Test MSE: {test_mse:.4f}, Test MAE: {test_mae:.4f}")

@@ -11,25 +11,58 @@ def count_parameters(model):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_pickle", type=str, default="data/all_graphs.pkl", help="Path to the pickle file containing the graphs.")
-    parser.add_argument("--root", type=str, default="data", help="Path to store processed data.")
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--data_pickle", type=str, default="data/all_graphs.pkl")
+    parser.add_argument("--root", type=str, default="data")
     parser.add_argument("--epochs", type=int, default=50)
+    # Die folgenden Parameter werden ggf. vom Sweep überschrieben
+    parser.add_argument("--learning_rate", type=float, default=0.001)
     parser.add_argument("--hidden_channels", type=int, default=64)
     parser.add_argument("--num_layers", type=int, default=2)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--project_name", type=str, default="gnn_shift_prediction")
     parser.add_argument("--run_name", type=str, default="run_1")
     args = parser.parse_args()
 
-    # Init wandb
-    wandb.init(project=args.project_name, name=args.run_name)
+    # Wenn Sie Sweeps benutzen, initialisieren Sie W&B ohne (oder mit minimalen) Parametern.
+    wandb.init(project=args.project_name)
 
-    # Einmalige Konvertierung der originalen NetworkX-Pickle-Datei, falls noch nicht geschehen
-    # MoleculeDataset.from_pickle(args.data_pickle, args.root)
-    
+    sweep_config = {
+    'method': 'bayes',  # z.B. 'grid', 'random', oder 'bayes'
+    'metric': {
+      'name': 'val_mse',   # Metrik, nach der optimiert wird (Val Loss o.ä.)
+      'goal': 'minimize'
+    },
+    'parameters': {
+        'learning_rate': {
+            'values': [0.001, 0.0005, 0.0001]   # verschiedene LR
+        },
+        'hidden_channels': {
+            'values': [32, 64, 128]            # verschiedene Hidden Größen
+        },
+        'num_layers': {
+            'values': [2, 3, 4]                # verschiedene Anzahl Layer
+        },
+        'batch_size': {
+            'values': [16, 32, 64]
+        },
+        # Weitere Hyperparameter können ergänzt werden
+    }
+}
+
+    # Die Hyperparameter kommen entweder von wandb.config (falls Sweep aktiv),
+    # oder von den Argumenten (falls kein Sweep).
+    config = wandb.config
+    lr = config.learning_rate if "learning_rate" in config else args.learning_rate
+    hidden_channels = config.hidden_channels if "hidden_channels" in config else args.hidden_channels
+    num_layers = config.num_layers if "num_layers" in config else args.num_layers
+    batch_size = config.batch_size if "batch_size" in config else args.batch_size
+    epochs = args.epochs
+
+    # Einmalige Konvertierung falls nötig
+    MoleculeDataset.from_pickle(args.data_pickle, args.root)
+
     dataset = MoleculeDataset(args.root)
-    
-    # Datensatz splitten
+
     num_data = len(dataset)
     train_split = int(0.8 * num_data)
     val_split = int(0.1 * num_data)
@@ -38,9 +71,9 @@ if __name__ == "__main__":
     val_dataset = dataset[train_split:train_split+val_split]
     test_dataset = dataset[train_split+val_split:]
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     in_channels = dataset[0].x.size(1)
     out_channels = 1
@@ -49,20 +82,18 @@ if __name__ == "__main__":
     wandb.config.update({
         "in_channels": in_channels,
         "out_channels": out_channels,
-        "hidden_channels": args.hidden_channels,
-        "num_layers": args.num_layers,
-        "epochs": args.epochs,
-        "batch_size": args.batch_size,
+        "hidden_channels": hidden_channels,
+        "num_layers": num_layers,
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "learning_rate": lr,
         "device": device.type
-    })
+    }, allow_val_change=True)
 
-    model = GNNModel(in_channels, args.hidden_channels, out_channels, args.num_layers).to(device)
+    model = GNNModel(in_channels, hidden_channels, out_channels, num_layers).to(device)
 
-    # Anzahl der Parameter loggen
     num_params = count_parameters(model)
     wandb.summary["num_trainable_params"] = num_params
-
-    # Modell "watchen"
     wandb.watch(model, log="all")
 
-    run_training(model, train_loader, val_loader, test_loader, args.epochs, device)
+    run_training(model, train_loader, val_loader, test_loader, epochs, device, lr)

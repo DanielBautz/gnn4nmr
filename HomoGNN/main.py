@@ -20,37 +20,10 @@ if __name__ == "__main__":
     parser.add_argument("--num_layers", type=int, default=2)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--project_name", type=str, default="gnn_shift_prediction")
-    parser.add_argument("--run_name", type=str, default="run_1")
     args = parser.parse_args()
 
-    # Wenn Sie Sweeps benutzen, initialisieren Sie W&B ohne (oder mit minimalen) Parametern.
     wandb.init(project=args.project_name)
 
-    sweep_config = {
-    'method': 'bayes',  # z.B. 'grid', 'random', oder 'bayes'
-    'metric': {
-      'name': 'val_mse',   # Metrik, nach der optimiert wird (Val Loss o.ä.)
-      'goal': 'minimize'
-    },
-    'parameters': {
-        'learning_rate': {
-            'values': [0.001, 0.0005, 0.0001]   # verschiedene LR
-        },
-        'hidden_channels': {
-            'values': [32, 64, 128]            # verschiedene Hidden Größen
-        },
-        'num_layers': {
-            'values': [2, 3, 4]                # verschiedene Anzahl Layer
-        },
-        'batch_size': {
-            'values': [16, 32, 64]
-        },
-        # Weitere Hyperparameter können ergänzt werden
-    }
-}
-
-    # Die Hyperparameter kommen entweder von wandb.config (falls Sweep aktiv),
-    # oder von den Argumenten (falls kein Sweep).
     config = wandb.config
     lr = config.learning_rate if "learning_rate" in config else args.learning_rate
     hidden_channels = config.hidden_channels if "hidden_channels" in config else args.hidden_channels
@@ -58,7 +31,7 @@ if __name__ == "__main__":
     batch_size = config.batch_size if "batch_size" in config else args.batch_size
     epochs = args.epochs
 
-    # Einmalige Konvertierung falls nötig
+    # Einmalige Konvertierung, falls data.pkl noch nicht existiert
     MoleculeDataset.from_pickle(args.data_pickle, args.root)
 
     dataset = MoleculeDataset(args.root)
@@ -67,6 +40,7 @@ if __name__ == "__main__":
     train_split = int(0.8 * num_data)
     val_split = int(0.1 * num_data)
     test_split = num_data - train_split - val_split
+
     train_dataset = dataset[:train_split]
     val_dataset = dataset[train_split:train_split+val_split]
     test_dataset = dataset[train_split+val_split:]
@@ -76,9 +50,10 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     in_channels = dataset[0].x.size(1)
-    out_channels = 1
+    out_channels = 2
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     wandb.config.update({
         "in_channels": in_channels,
         "out_channels": out_channels,

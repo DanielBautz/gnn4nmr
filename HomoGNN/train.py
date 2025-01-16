@@ -1,3 +1,4 @@
+import copy  # NEU: für deepcopy
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -108,9 +109,23 @@ def test(model, loader, device):
 def run_training(model, train_loader, val_loader, test_loader, epochs, device, lr):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    # NEU: Hier speichern wir das beste Modell
+    best_val_score = float('inf')
+    best_model_state = None
+
     for epoch in range(1, epochs+1):
         train_mse_C, train_mae_C, train_mse_H, train_mae_H = train(model, train_loader, optimizer, device)
         val_mse_C, val_mae_C, val_mse_H, val_mae_H = test(model, val_loader, device)
+
+        # Beispiel: Wir nehmen die Summe der MSEs als "Val-Score"
+        # Du kannst stattdessen auch (val_mse_C + val_mse_H)/2 nehmen, etc.
+        val_score = (val_mse_C if not np.isnan(val_mse_C) else 0) \
+                    + (val_mse_H if not np.isnan(val_mse_H) else 0)
+
+        # Check, ob neues bestes Modell
+        if val_score < best_val_score:
+            best_val_score = val_score
+            best_model_state = copy.deepcopy(model.state_dict())
 
         wandb.log({
             "epoch": epoch,
@@ -121,9 +136,15 @@ def run_training(model, train_loader, val_loader, test_loader, epochs, device, l
             "val_mse_C": val_mse_C,
             "val_mae_C": val_mae_C,
             "val_mse_H": val_mse_H,
-            "val_mae_H": val_mae_H
+            "val_mae_H": val_mae_H,
+            "val_score": val_score
         })
 
+    # Nach dem Training: Lade das beste Modell wieder
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+
+    # Jetzt Testevaluation mit dem besten Modell
     test_mse_C, test_mae_C, test_mse_H, test_mae_H = test(model, test_loader, device)
     wandb.log({
         "test_mse_C": test_mse_C,
@@ -131,3 +152,6 @@ def run_training(model, train_loader, val_loader, test_loader, epochs, device, l
         "test_mse_H": test_mse_H,
         "test_mae_H": test_mae_H
     })
+
+    # Modell lokal speichern (z.B. als "best_model.pt")
+    torch.save(model.state_dict(), "best_model.pt")

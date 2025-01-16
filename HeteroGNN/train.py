@@ -1,28 +1,31 @@
-# train.py
 import torch
 import torch.nn.functional as F
 import wandb
 
 def compute_metrics(pred, target):
-    """Hilfsfunktion, um MSE und MAE zu berechnen."""
+    """Berechnet MSE und MAE."""
     mse = F.mse_loss(pred, target)
     mae = F.l1_loss(pred, target)
     return mse, mae
 
-def train_one_epoch(model, dataloader, device, optimizer, epoch):
-    """Trainingsschleife für eine Epoche. Loggt train_mse & train_mae."""
+
+def train_one_epoch(model, dataloader, device, optimizer):
+    """
+    Trainiert über eine Epoche.
+    Berechnet separate Metriken für H und C und kombiniert den Loss.
+    """
     model.train()
-    total_mse = 0.0
-    total_mae = 0.0
-    count = 0
+    
+    # Zum Aufsummieren
+    total_mse_H, total_mae_H, count_H = 0.0, 0.0, 0
+    total_mse_C, total_mae_C, count_C = 0.0, 0.0, 0
     
     for batch_data in dataloader:
         batch_data = batch_data.to(device)
         optimizer.zero_grad()
         
-        # Node-Features und -Labels in Dictionaries
-        x_dict = {}
-        y_dict = {}
+        # x_dict, y_dict, edge_index_dict erstellen
+        x_dict, y_dict = {}, {}
         for ntype in batch_data.node_types:
             x_dict[ntype] = batch_data[ntype].x
             y_dict[ntype] = getattr(batch_data[ntype], 'y', None)
@@ -32,76 +35,66 @@ def train_one_epoch(model, dataloader, device, optimizer, epoch):
             src, rel, dst = store._key
             edge_index_dict[(src, rel, dst)] = store.edge_index
         
+        # Vorwärtslauf
         out_dict = model(x_dict, edge_index_dict)
         
-        # Aufsummieren der Fehler für H und C
-        mse_sum = 0.0
-        mae_sum = 0.0
-        valid_ntype_count = 0
+        # MSE/MAE berechnen für H und C
+        loss_terms = []
         
-        for ntype in ['H', 'C']:
-            if out_dict.get(ntype) is not None and y_dict.get(ntype) is not None:
-                valid_mask = ~torch.isnan(y_dict[ntype])
-                if valid_mask.sum() > 0:
-                    pred = out_dict[ntype][valid_mask.view(-1)]
-                    target = y_dict[ntype][valid_mask.view(-1)]
-                    
-                    mse_ntype, mae_ntype = compute_metrics(pred, target)
-                    mse_sum += mse_ntype.item()
-                    mae_sum += mae_ntype.item()
-                    valid_ntype_count += 1
+        # H
+        if out_dict['H'] is not None and y_dict['H'] is not None:
+            valid_mask = ~torch.isnan(y_dict['H'])
+            if valid_mask.sum() > 0:
+                pred_H = out_dict['H'][valid_mask]
+                target_H = y_dict['H'][valid_mask]
+                mse_H, mae_H = compute_metrics(pred_H, target_H)
+                loss_terms.append(mse_H)  # MSE-H geht in den Loss
+                total_mse_H += mse_H.item()
+                total_mae_H += mae_H.item()
+                count_H += 1
         
-        if valid_ntype_count > 0:
-            # Mittelwert über H und C bilden
-            mse_avg = mse_sum / valid_ntype_count
-            mae_avg = mae_sum / valid_ntype_count
-            
-            # Loss für Backprop (hier MSE)
-            # In PyTorch-Geometric-Szenarien rechnet man oft direkt auf pred, target. 
-            # Hier machen wir's vereinfacht: 
-            loss = torch.tensor(mse_avg, requires_grad=True)
+        # C
+        if out_dict['C'] is not None and y_dict['C'] is not None:
+            valid_mask = ~torch.isnan(y_dict['C'])
+            if valid_mask.sum() > 0:
+                pred_C = out_dict['C'][valid_mask]
+                target_C = y_dict['C'][valid_mask]
+                mse_C, mae_C = compute_metrics(pred_C, target_C)
+                loss_terms.append(mse_C)  # MSE-C geht in den Loss
+                total_mse_C += mse_C.item()
+                total_mae_C += mae_C.item()
+                count_C += 1
+        
+        # Kombinierten Loss bilden (z.B. Mittelwert der vorhandenen MSEs)
+        if len(loss_terms) > 0:
+            loss = torch.stack(loss_terms).mean()
             loss.backward()
-            
-            total_mse += mse_avg
-            total_mae += mae_avg
-            count += 1
-        else:
-            # Falls kein H oder C im Batch, skip
-            continue
-        
-        optimizer.step()
+            optimizer.step()
     
-    if count > 0:
-        epoch_mse = total_mse / count
-        epoch_mae = total_mae / count
-    else:
-        epoch_mse = 0.0
-        epoch_mae = 0.0
+    # Am Ende der Epoche Mittelwerte pro Typ
+    train_mse_H = total_mse_H / count_H if count_H > 0 else 0.0
+    train_mae_H = total_mae_H / count_H if count_H > 0 else 0.0
+    train_mse_C = total_mse_C / count_C if count_C > 0 else 0.0
+    train_mae_C = total_mae_C / count_C if count_C > 0 else 0.0
     
-    wandb.log({
-        "train_mse": epoch_mse,
-        "train_mae": epoch_mae,
-        "epoch": epoch
-    })
-    
-    return epoch_mse, epoch_mae
+    return train_mse_H, train_mae_H, train_mse_C, train_mae_C
+
 
 @torch.no_grad()
-def evaluate(model, dataloader, device, epoch, prefix="val"):
+def evaluate(model, dataloader, device):
     """
-    Evaluationsroutine. Kann prefix="val" oder "test" sein.
-    Loggt val_mse, val_mae oder test_mse, test_mae entsprechend.
+    Berechnet MSE/MAE für H und C, liefert auch einen 'score' zurück,
+    z.B. den Durchschnitt aus MSE-H und MSE-C.
     """
     model.eval()
-    total_mse = 0.0
-    total_mae = 0.0
-    count = 0
+    
+    total_mse_H, total_mae_H, count_H = 0.0, 0.0, 0
+    total_mse_C, total_mae_C, count_C = 0.0, 0.0, 0
     
     for batch_data in dataloader:
         batch_data = batch_data.to(device)
         
-        x_dict = {}
-        y_dict = {}
+        x_dict, y_dict = {}, {}
         for ntype in batch_data.node_types:
             x_dict[ntype] = batch_data[ntype].x
             y_dict[ntype] = getattr(batch_data[ntype], 'y', None)
@@ -113,68 +106,96 @@ def evaluate(model, dataloader, device, epoch, prefix="val"):
         
         out_dict = model(x_dict, edge_index_dict)
         
-        mse_sum = 0.0
-        mae_sum = 0.0
-        valid_ntype_count = 0
+        # H
+        if out_dict['H'] is not None and y_dict['H'] is not None:
+            valid_mask = ~torch.isnan(y_dict['H'])
+            if valid_mask.sum() > 0:
+                pred_H = out_dict['H'][valid_mask]
+                target_H = y_dict['H'][valid_mask]
+                mse_H, mae_H = compute_metrics(pred_H, target_H)
+                total_mse_H += mse_H.item()
+                total_mae_H += mae_H.item()
+                count_H += 1
         
-        for ntype in ['H', 'C']:
-            if out_dict.get(ntype) is not None and y_dict.get(ntype) is not None:
-                valid_mask = ~torch.isnan(y_dict[ntype])
-                if valid_mask.sum() > 0:
-                    pred = out_dict[ntype][valid_mask.view(-1)]
-                    target = y_dict[ntype][valid_mask.view(-1)]
-                    
-                    mse_ntype, mae_ntype = compute_metrics(pred, target)
-                    mse_sum += mse_ntype.item()
-                    mae_sum += mae_ntype.item()
-                    valid_ntype_count += 1
-        
-        if valid_ntype_count > 0:
-            total_mse += (mse_sum / valid_ntype_count)
-            total_mae += (mae_sum / valid_ntype_count)
-            count += 1
+        # C
+        if out_dict['C'] is not None and y_dict['C'] is not None:
+            valid_mask = ~torch.isnan(y_dict['C'])
+            if valid_mask.sum() > 0:
+                pred_C = out_dict['C'][valid_mask]
+                target_C = y_dict['C'][valid_mask]
+                mse_C, mae_C = compute_metrics(pred_C, target_C)
+                total_mse_C += mse_C.item()
+                total_mae_C += mae_C.item()
+                count_C += 1
+    
+    val_mse_H = total_mse_H / count_H if count_H > 0 else 0.0
+    val_mae_H = total_mae_H / count_H if count_H > 0 else 0.0
+    val_mse_C = total_mse_C / count_C if count_C > 0 else 0.0
+    val_mae_C = total_mae_C / count_C if count_C > 0 else 0.0
+    
+    # Beispiel: Mittelwert beider MSEs als 'val_score' (für "best model")
+    val_score = (val_mse_H + val_mse_C) / 2.0
+    
+    return val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score
 
-    if count > 0:
-        epoch_mse = total_mse / count
-        epoch_mae = total_mae / count
-    else:
-        epoch_mse = 0.0
-        epoch_mae = 0.0
-    
-    wandb.log({
-        f"{prefix}_mse": epoch_mse,
-        f"{prefix}_mae": epoch_mae,
-        "epoch": epoch
-    })
-    
-    return epoch_mse, epoch_mae
 
 def train_model(model, train_loader, val_loader, test_loader, device, config):
     """
-    Haupt-Trainingsfunktion:
-      - Enthält Epocenschleife für Training und Validation.
-      - Lädt am Ende das beste Modell und führt (falls gewünscht) Test-Evaluierung durch.
+    Haupttrainingsschleife:
+      - Single-Model, multi-task (H und C).
+      - Loggt train/val/test MSE und MAE für beide Targets.
     """
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
     
-    best_val_mse = float('inf')
+    best_val_score = float('inf')
     
     for epoch in range(config.num_epochs):
-        train_mse, train_mae = train_one_epoch(model, train_loader, device, optimizer, epoch)
-        val_mse, val_mae = evaluate(model, val_loader, device, epoch, prefix="val")
+        # Training
+        train_mse_H, train_mae_H, train_mse_C, train_mae_C = train_one_epoch(
+            model, train_loader, device, optimizer
+        )
+        # Validation
+        val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score = evaluate(
+            model, val_loader, device
+        )
+        
+        # Loggen
+        wandb.log({
+            "epoch": epoch,
+            "train_mse_C": train_mse_C,
+            "train_mae_C": train_mae_C,
+            "train_mse_H": train_mse_H,
+            "train_mae_H": train_mae_H,
+            "val_mse_C": val_mse_C,
+            "val_mae_C": val_mae_C,
+            "val_mse_H": val_mse_H,
+            "val_mae_H": val_mae_H,
+            "val_score": val_score
+        })
         
         print(f"Epoch [{epoch+1}/{config.num_epochs}]")
-        print(f" - train_mse: {train_mse:.4f} | train_mae: {train_mae:.4f}")
-        print(f" - val_mse:   {val_mse:.4f}   | val_mae:   {val_mae:.4f}")
+        print(f"  Train   => H: MSE={train_mse_H:.4f}, MAE={train_mae_H:.4f} |"
+              f"  C: MSE={train_mse_C:.4f}, MAE={train_mae_C:.4f}")
+        print(f"  Val     => H: MSE={val_mse_H:.4f}, MAE={val_mae_H:.4f} |"
+              f"  C: MSE={val_mse_C:.4f}, MAE={val_mae_C:.4f} | val_score={val_score:.4f}")
         
-        # optional: Best model speichern
-        if val_mse < best_val_mse:
-            best_val_mse = val_mse
+        # Bestes Modell speichern
+        if val_score < best_val_score:
+            best_val_score = val_score
             torch.save(model.state_dict(), "best_model.pt")
     
-    # 4) Test-Evaluierung mit Best-Model (optional)
+    # Test-Phase mit best_model
     model.load_state_dict(torch.load("best_model.pt"))
-    test_mse, test_mae = evaluate(model, test_loader, device, epoch=config.num_epochs, prefix="test")
-    print(f"Test MSE: {test_mse:.4f}, Test MAE: {test_mae:.4f}")
+    test_mse_H, test_mae_H, test_mse_C, test_mae_C, _ = evaluate(model, test_loader, device)
+    
+    wandb.log({
+        "test_mse_C": test_mse_C,
+        "test_mae_C": test_mae_C,
+        "test_mse_H": test_mse_H,
+        "test_mae_H": test_mae_H
+    })
+    
+    print(f"** Test ** => H: MSE={test_mse_H:.4f}, MAE={test_mae_H:.4f} |"
+          f"  C: MSE={test_mse_C:.4f}, MAE={test_mae_C:.4f}")
     
     return model

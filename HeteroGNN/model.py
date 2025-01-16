@@ -1,4 +1,3 @@
-# model.py
 import torch
 import torch.nn as nn
 from torch_geometric.nn import HeteroConv, GraphConv
@@ -31,8 +30,7 @@ class HeteroGNNModel(nn.Module):
         for ntype, in_dim in in_dim_dict.items():
             self.encoder_dict[ntype] = MLPEncoder(in_dim, hidden_dim, out_dim)
         
-        # 2) HeteroConv-Schicht(en) - Hier mit GraphConv statt GCNConv
-        #    GraphConv unterstützt bipartite Message Passing und fügt keine Self-Loops automatisch hinzu.
+        # 2) HeteroConv-Schichten (mit GraphConv)
         self.conv1 = HeteroConv({
             ('H', 'bond', 'H'): GraphConv(out_dim, out_dim),
             ('H', 'bond', 'C'): GraphConv(out_dim, out_dim),
@@ -61,7 +59,7 @@ class HeteroGNNModel(nn.Module):
             ('Others', 'bond', 'Others'): GraphConv(out_dim, out_dim),
         }, aggr='sum')
         
-        # 3) Output MLP-Köpfe für Shift-Vorhersage (Node-Regression) nur für H und C
+        # 3) Zwei Output-Köpfe für Shift-Vorhersage (Node-Regression) - einmal für H, einmal für C
         self.pred_heads = nn.ModuleDict({
             'H': nn.Sequential(nn.Linear(out_dim, 1)), 
             'C': nn.Sequential(nn.Linear(out_dim, 1))
@@ -69,8 +67,8 @@ class HeteroGNNModel(nn.Module):
         
     def forward(self, x_dict, edge_index_dict):
         """
-        x_dict: Dictionary { 'H': [num_H, in_dim], 'C': [num_C, in_dim], 'Others': [num_O, in_dim] }
-        edge_index_dict: Dictionary mit Kanten pro Relation
+        x_dict: Dict { 'H': [num_H, in_dim], 'C': [num_C, in_dim], 'Others': [num_O, in_dim] }
+        edge_index_dict: Dict mit Kanten pro Relation
         """
         # (1) Rohfeatures -> MLP-Encoder
         for ntype, x in x_dict.items():

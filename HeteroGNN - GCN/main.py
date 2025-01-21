@@ -24,7 +24,7 @@ def main():
     config.batch_size = 4
     config.hidden_dim = 32
     config.out_dim = 16
-    config.num_epochs = 10
+    config.num_epochs = 50
     config.lr = 1e-3
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

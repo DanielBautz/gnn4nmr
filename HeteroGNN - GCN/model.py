@@ -77,12 +77,12 @@ class HeteroGNNModel(nn.Module):
         # (2) Erste HeteroConv-Schicht
         x_dict = self.conv1(x_dict, edge_index_dict)
         for ntype in x_dict:
-            x_dict[ntype] = nn.Softmax()(x_dict[ntype])
+            x_dict[ntype] = nn.ReLU()(x_dict[ntype])
         
         # (3) Zweite HeteroConv-Schicht
         x_dict = self.conv2(x_dict, edge_index_dict)
         for ntype in x_dict:
-            x_dict[ntype] = nn.Softmax()(x_dict[ntype])
+            x_dict[ntype] = nn.ReLU()(x_dict[ntype])
         
         # (4) Vorhersagen für H und C
         out_dict = {}

@@ -22,9 +22,9 @@ def main():
     
     # 3) Hyperparameter
     config.batch_size = 4
-    config.hidden_dim = 32
-    config.out_dim = 16
-    config.num_epochs = 50
+    config.hidden_dim = 64
+    config.out_dim = 32
+    config.num_epochs = 200
     config.lr = 1e-3
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

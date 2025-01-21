@@ -1,11 +1,12 @@
 import os
 import pickle
 import torch
+import random
 import numpy as np
 from torch.utils.data import Dataset
 from torch_geometric.data import HeteroData
 from torch_geometric.loader import DataLoader as PyGDataLoader
-import random
+
 
 class ShiftDataset(Dataset):
     def __init__(self, root_dir="data", file_name="all_graphs.pkl"):
@@ -22,43 +23,60 @@ class ShiftDataset(Dataset):
     def __getitem__(self, idx):
         nx_g = self.nx_graphs[idx]
         
+        # Heterogenes Data-Objekt
         data = HeteroData()
         
-        # --- Listen für Knoten-IDs pro Typ ---
+        # -- Node-Indizes pro Typ --
         h_nodes, c_nodes, o_nodes = [], [], []
         
-        # --- Feature-Listen pro Typ ---
+        # -- Feature-Listen pro Typ --
         h_features, c_features, o_features = [], [], []
         
-        # --- Shift-Listen (Labels) ---
+        # -- Shift-Listen (Labels) --
         h_shifts, c_shifts, o_shifts = [], [], []
         
         node_idx_map = {}
-        
-        # --------------------------------------------------------------------
-        # HILFSFUNKTION: Node-Features generieren
-        # --------------------------------------------------------------------
+
+        # -------------------------------------------------------
+        # Hilfsfunktionen zum Extrahieren der Node-Features
+        # -------------------------------------------------------
         def get_h_features(attrs):
             """
-            Hier wird definiert, welche Felder für H als Feature genutzt werden.
-            Gib am Ende eine (beliebig lange) Liste von floats zurück.
+            Enthält alle in deinem Beispiel für Wasserstoff genannten Felder:
+              - Atom-Index, Koordinaten, Mass, Ladung, Grad, shift_low, CN(X), 
+                verschiedene no_*-Zähler, dist_HC, shift_low_neighbor_C,
+                Abschirmungen, Ladungsverteilungen etc.
             """
             feats = []
-            # Beispiel: Positionskoordinaten (3 floats)
+            # z.B. atom_idx als float
+            feats.append(float(attrs.get('atom_idx', -1)))
+            
+            # Position (x, y, z)
             pos = attrs.get('pos', (0.0, 0.0, 0.0))
             feats.extend([pos[0], pos[1], pos[2]])
             
-            # Mass, formale Ladung, Grad (Anzahl Bindungen)
-            feats.append(attrs.get('mass', 0.0))
-            feats.append(attrs.get('formal_charge', 0.0))
-            feats.append(attrs.get('degree', 0.0))
+            feats.append(attrs.get('mass', 0.0))           # mass
+            feats.append(attrs.get('formal_charge', 0.0))  # formal_charge
+            feats.append(attrs.get('degree', 0.0))         # degree
             
-            # Weitere Felder (hier nur exemplarisch)
+            # shift_low (zusätzlich zum Label shift_high-low)
+            feats.append(attrs.get('shift_low', 0.0))
+            
+            # CN(X)
             feats.append(attrs.get('CN(X)', 0.0))
+            
+            # no_HCH, no_HYH, no_HYC, no_HYN, no_HYO
             feats.append(attrs.get('no_HCH', 0.0))
+            feats.append(attrs.get('no_HYH', 0.0))
+            feats.append(attrs.get('no_HYC', 0.0))
+            feats.append(attrs.get('no_HYN', 0.0))
             feats.append(attrs.get('no_HYO', 0.0))
             
-            # Abschirmung (shielding_dia, shielding_para etc.)
+            # dist_HC, shift_low_neighbor_C
+            feats.append(attrs.get('dist_HC', 0.0))
+            feats.append(attrs.get('shift_low_neighbor_C', 0.0))
+            
+            # Abschirmung
             feats.append(attrs.get('shielding_dia', 0.0))
             feats.append(attrs.get('shielding_para', 0.0))
             feats.append(attrs.get('span', 0.0))
@@ -66,7 +84,7 @@ class ShiftDataset(Dataset):
             feats.append(attrs.get('asymmetry', 0.0))
             feats.append(attrs.get('anisotropy', 0.0))
             
-            # Elektronen-Ladungen
+            # Atom-Ladungen
             feats.append(attrs.get('at_charge_mull', 0.0))
             feats.append(attrs.get('at_charge_loew', 0.0))
             
@@ -85,10 +103,14 @@ class ShiftDataset(Dataset):
         
         def get_c_features(attrs):
             """
-            Beispiel für C-Features.
-            Nutze ähnliche oder andere Felder wie bei H.
+            Enthält alle in deinem Beispiel für Kohlenstoff genannten Felder:
+              - atom_idx, pos, mass, formal_charge, degree, shift_low, CN(X),
+                no_CH/no_CC/... etc., Abschirmungen, Ladungen, Orbital-Infos, 
+                BO-Werte, etc.
             """
             feats = []
+            feats.append(float(attrs.get('atom_idx', -1)))
+            
             pos = attrs.get('pos', (0.0, 0.0, 0.0))
             feats.extend([pos[0], pos[1], pos[2]])
             
@@ -96,15 +118,20 @@ class ShiftDataset(Dataset):
             feats.append(attrs.get('formal_charge', 0.0))
             feats.append(attrs.get('degree', 0.0))
             
-            # Shift_low und CN(X) ...
             feats.append(attrs.get('shift_low', 0.0))
             feats.append(attrs.get('CN(X)', 0.0))
             
-            # Beispiel: no_CH, no_CO, ...
+            # no_CH, no_CC, no_CN, no_CO, no_CYH, no_CYC, no_CYN, no_CYO
             feats.append(attrs.get('no_CH', 0.0))
+            feats.append(attrs.get('no_CC', 0.0))
+            feats.append(attrs.get('no_CN', 0.0))
             feats.append(attrs.get('no_CO', 0.0))
+            feats.append(attrs.get('no_CYH', 0.0))
+            feats.append(attrs.get('no_CYC', 0.0))
+            feats.append(attrs.get('no_CYN', 0.0))
+            feats.append(attrs.get('no_CYO', 0.0))
             
-            # Shielding
+            # Abschirmung
             feats.append(attrs.get('shielding_dia', 0.0))
             feats.append(attrs.get('shielding_para', 0.0))
             feats.append(attrs.get('span', 0.0))
@@ -120,11 +147,19 @@ class ShiftDataset(Dataset):
             feats.append(attrs.get('orb_charge_mull_s', 0.0))
             feats.append(attrs.get('orb_charge_mull_p', 0.0))
             feats.append(attrs.get('orb_charge_mull_d', 0.0))
+            
+            # stdev_mull_p
+            feats.append(attrs.get('orb_stdev_mull_p', 0.0))
+            
+            # Loew
             feats.append(attrs.get('orb_charge_loew_s', 0.0))
             feats.append(attrs.get('orb_charge_loew_p', 0.0))
             feats.append(attrs.get('orb_charge_loew_d', 0.0))
             
-            # Bindungsordnungen
+            # stdev_loew_p
+            feats.append(attrs.get('orb_stdev_loew_p', 0.0))
+            
+            # BO_loew_sum, BO_loew_av, BO_mayer_sum, BO_mayer_av, mayer_VA
             feats.append(attrs.get('BO_loew_sum', 0.0))
             feats.append(attrs.get('BO_loew_av', 0.0))
             feats.append(attrs.get('BO_mayer_sum', 0.0))
@@ -135,10 +170,13 @@ class ShiftDataset(Dataset):
         
         def get_others_features(attrs):
             """
-            Beispiel für O oder andere 'Others'.
-            Man kann hier ggf. weniger Felder nehmen.
+            Für alle restlichen Elemente (z.B. O).
+            Du kannst hier bei Bedarf ähnlich viele Felder hinzufügen wie bei H oder C,
+            sofern sie existieren.
             """
             feats = []
+            feats.append(float(attrs.get('atom_idx', -1)))
+            
             pos = attrs.get('pos', (0.0, 0.0, 0.0))
             feats.extend([pos[0], pos[1], pos[2]])
             
@@ -146,19 +184,19 @@ class ShiftDataset(Dataset):
             feats.append(attrs.get('formal_charge', 0.0))
             feats.append(attrs.get('degree', 0.0))
             
-            # Falls du auch 'shift_high-low' von Others willst (normalerweise NaN/None)
-            # feats.append(attrs.get('shift_high-low', 0.0))
+            # Wenn du mehr Felder für O oder andere willst, hier ergänzen.
+            # z.B. shift_low, ...
             
             return feats
         
-        # --------------------------------------------------------------------
-        # 1) Schleife über Knoten, Features sammeln
-        # --------------------------------------------------------------------
+        # -------------------------------------------------------
+        # 1) Knoten-Schleife
+        # -------------------------------------------------------
         for node in nx_g.nodes():
             attrs = nx_g.nodes[node]
             element = attrs["element"]
             
-            # SHIFT für H/C (das ist dein Label)
+            # shift_high-low als Label (nur H und C)
             shift_val = attrs.get("shift_high-low", float('nan'))
             
             if element == "H":
@@ -176,18 +214,17 @@ class ShiftDataset(Dataset):
                 c_shifts.append(shift_val)
                 feats = get_c_features(attrs)
                 c_features.append(feats)
+                
             else:
-                # Alle restlichen Elemente
+                # z.B. O, N, S, ...
                 node_idx_map[node] = len(o_nodes)
                 o_nodes.append(node)
                 
-                # Im Normalfall haben wir kein shift => NaN
-                o_shifts.append(float('nan'))
-                
+                o_shifts.append(float('nan'))  # i.d.R. kein Shift
                 feats = get_others_features(attrs)
                 o_features.append(feats)
         
-        # --- Konvertieren in Torch-Tensoren ---
+        # Tensor-Konvertierung
         h_x = torch.tensor(h_features, dtype=torch.float)
         c_x = torch.tensor(c_features, dtype=torch.float)
         o_x = torch.tensor(o_features, dtype=torch.float)
@@ -196,11 +233,11 @@ class ShiftDataset(Dataset):
         c_y = torch.tensor(c_shifts, dtype=torch.float).view(-1, 1) if len(c_shifts) else torch.empty((0,1))
         o_y = torch.tensor(o_shifts, dtype=torch.float).view(-1, 1) if len(o_shifts) else torch.empty((0,1))
         
-        # --------------------------------------------------------------------
-        # 2) Edges: Erstellen + Edge-Features
-        # --------------------------------------------------------------------
+        # -------------------------------------------------------
+        # 2) Kanten + Edge-Features
+        # -------------------------------------------------------
         edge_index_dict = {}
-        edge_attr_dict = {}  # Neu: hier speichern wir Edge-Features
+        edge_attr_dict = {}
         
         def add_edge(src_type, dst_type, src_id, dst_id, bond_feat):
             rel = (src_type, "bond", dst_type)
@@ -210,23 +247,12 @@ class ShiftDataset(Dataset):
             
             edge_index_dict[rel][0].append(src_id)
             edge_index_dict[rel][1].append(dst_id)
-            
-            # Edge-Feature-Vector aufbauen
             edge_attr_dict[rel].append(bond_feat)
         
-        # Hilfsfunktion, um aus NX-Bond-Attr ein Float-Feature-Array zu bauen
         def get_bond_features(bond_data):
             """
-            Mach z.B. aus 'bond_type', 'is_aromatic', 'bond_dir', 'bond_order' 
-            einen Float-Vektor. 
-            
-            Hier nur ein Beispiel, wie man es umsetzen könnte:
-            - bond_type => one-hot oder Mapping (SINGLE=1, DOUBLE=2,...)
-            - is_aromatic => 0/1
-            - bond_dir => 0/1/2 (Mapping), etc.
-            - bond_order => float
+            bond_type, is_aromatic, bond_dir, bond_order => Float-Featurearray
             """
-            # Mapping bond_type
             bt = bond_data.get('bond_type', 'SINGLE')
             if bt == 'SINGLE':
                 bt_val = 1.0
@@ -237,26 +263,23 @@ class ShiftDataset(Dataset):
             else:
                 bt_val = 0.0
             
-            # is_aromatic => True/False
             is_arom = 1.0 if bond_data.get('is_aromatic', False) else 0.0
             
-            # bond_dir => Mapping
             bd = bond_data.get('bond_dir', 'NONE')
-            bd_val = 0.0
             if bd == 'NONE':
                 bd_val = 0.0
             elif bd == 'ENDUPRIGHT':
                 bd_val = 1.0
-            # ggf. weitere Fälle
+            else:
+                bd_val = 0.5  # Beispiel für unbekannte Fälle
             
-            # bond_order
             bo = bond_data.get('bond_order', 1.0)
             
             return [bt_val, is_arom, bd_val, bo]
         
-        # NX edges iterieren
+        # NetworkX-Kanten
         for u, v in nx_g.edges():
-            bond_data = nx_g[u][v]  # Kantenattribute in NetworkX
+            bond_data = nx_g[u][v]  # z.B. {'bond_type': 'SINGLE', ...}
             bond_feat = get_bond_features(bond_data)
             
             u_element = nx_g.nodes[u]["element"]
@@ -286,9 +309,7 @@ class ShiftDataset(Dataset):
             add_edge(u_type, v_type, u_idx, v_idx, bond_feat)
             add_edge(v_type, u_type, v_idx, u_idx, bond_feat)
         
-        # --------------------------------------------------------------------
-        # 3) HeteroData befüllen
-        # --------------------------------------------------------------------
+        # -- HeteroData füllen --
         if len(h_nodes) > 0:
             data['H'].x = h_x
             data['H'].y = h_y
@@ -302,10 +323,7 @@ class ShiftDataset(Dataset):
         # Edges + Edge-Features
         for rel, (row, col) in edge_index_dict.items():
             data[rel].edge_index = torch.tensor([row, col], dtype=torch.long)
-            
-            # Edge-Feature array in FloatTensor
-            edge_feats = edge_attr_dict[rel]
-            edge_feats = torch.tensor(edge_feats, dtype=torch.float)
+            edge_feats = torch.tensor(edge_attr_dict[rel], dtype=torch.float)
             data[rel].edge_attr = edge_feats
         
         return data

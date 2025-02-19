@@ -48,7 +48,7 @@ def train_one_epoch(model, dataloader, device, optimizer):
                 pred_H = out_dict['H'][valid_mask]
                 target_H = y_dict['H'][valid_mask]
                 mse_H, mae_H = compute_metrics(pred_H, target_H)
-                loss_terms.append(mse_H)  # MSE-H geht in den Loss
+                loss_terms.append(mae_H*10)  # MSE-H geht in den Loss
                 total_mse_H += mse_H.item()
                 total_mae_H += mae_H.item()
                 count_H += 1
@@ -60,7 +60,7 @@ def train_one_epoch(model, dataloader, device, optimizer):
                 pred_C = out_dict['C'][valid_mask]
                 target_C = y_dict['C'][valid_mask]
                 mse_C, mae_C = compute_metrics(pred_C, target_C)
-                loss_terms.append(mse_C)  # MSE-C geht in den Loss
+                #loss_terms.append(mse_C)  # MSE-C geht in den Loss
                 total_mse_C += mse_C.item()
                 total_mae_C += mae_C.item()
                 count_C += 1
@@ -83,8 +83,7 @@ def train_one_epoch(model, dataloader, device, optimizer):
 @torch.no_grad()
 def evaluate(model, dataloader, device):
     """
-    Berechnet MSE/MAE für H und C, liefert auch einen 'score' zurück,
-    z.B. den Durchschnitt aus MSE-H und MSE-C.
+    Berechnet MSE/MAE für H und C, liefert auch einen 'score' zurück
     """
     model.eval()
     
@@ -134,7 +133,10 @@ def evaluate(model, dataloader, device):
     val_mae_C = total_mae_C / count_C if count_C > 0 else 0.0
     
     # Beispiel: Mittelwert beider MSEs als 'val_score' (für "best model")
-    val_score = (val_mse_H + val_mse_C) / 2.0
+    #val_score = (val_mse_H + val_mse_C) / 2.0
+    # Beispiel: Mittelwert beider MAEs als 'val_score' (für "best model")
+    val_score = (val_mae_H*10 + val_mae_C) / 2.0
+    #val_score = val_mae_H
     
     return val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score
 

@@ -74,8 +74,8 @@ class ShiftDataset(Dataset):
             feats.append(float(attrs.get('atom_idx', -1)))
             
             # 3) Position (x, y, z)
-            pos = attrs.get('pos', (0.0, 0.0, 0.0))
-            feats.extend([pos[0], pos[1], pos[2]])
+            #pos = attrs.get('pos', (0.0, 0.0, 0.0))
+            #feats.extend([pos[0], pos[1], pos[2]])
             
             # 4) Mass, formale Ladung, Grad
             feats.append(attrs.get('mass', 0.0))
@@ -134,8 +134,8 @@ class ShiftDataset(Dataset):
             feats.append(float(attrs.get('atom_idx', -1)))
             
             # 3) pos
-            pos = attrs.get('pos', (0.0, 0.0, 0.0))
-            feats.extend([pos[0], pos[1], pos[2]])
+            #pos = attrs.get('pos', (0.0, 0.0, 0.0))
+            #feats.extend([pos[0], pos[1], pos[2]])
             
             # 4) mass, formal_charge, degree
             feats.append(attrs.get('mass', 0.0))
@@ -203,8 +203,8 @@ class ShiftDataset(Dataset):
             feats.append(float(attrs.get('atom_idx', -1)))
             
             # 3) pos
-            pos = attrs.get('pos', (0.0, 0.0, 0.0))
-            feats.extend([pos[0], pos[1], pos[2]])
+            #pos = attrs.get('pos', (0.0, 0.0, 0.0))
+            #feats.extend([pos[0], pos[1], pos[2]])
             
             # 4) mass, formal_charge, degree
             feats.append(attrs.get('mass', 0.0))
@@ -356,6 +356,59 @@ class ShiftDataset(Dataset):
 
 
 def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl"):
+    dataset = ShiftDataset(root_dir=root_dir, file_name=file_name)
+    
+    # Gruppiere Graphen nach dem 'compound'-Attribut (das in den Graph-Attributen gespeichert ist)
+    compound_to_indices = {}
+    for idx, nx_g in enumerate(dataset.nx_graphs):
+        compound = nx_g.graph.get("compound", None)
+        if compound is None:
+            compound = "unknown"  # Fallback, falls kein compound gesetzt ist
+        if compound not in compound_to_indices:
+            compound_to_indices[compound] = []
+        compound_to_indices[compound].append(idx)
+    
+    # Erstelle eine Liste aller Compounds und mische diese zufällig
+    compounds = list(compound_to_indices.keys())
+    random.shuffle(compounds)
+    
+    num_compounds = len(compounds)
+    train_end = int(0.8 * num_compounds)
+    val_end = int(0.9 * num_compounds)
+    
+    train_compounds = compounds[:train_end]
+    val_compounds = compounds[train_end:val_end]
+    test_compounds = compounds[val_end:]
+    
+    # Sammle die Indizes für jeden Split basierend auf den Compounds
+    train_indices = []
+    for comp in train_compounds:
+        train_indices.extend(compound_to_indices[comp])
+    
+    val_indices = []
+    for comp in val_compounds:
+        val_indices.extend(compound_to_indices[comp])
+    
+    test_indices = []
+    for comp in test_compounds:
+        test_indices.extend(compound_to_indices[comp])
+    
+    # Optional: Shuffle innerhalb der einzelnen Splits
+    random.shuffle(train_indices)
+    random.shuffle(val_indices)
+    random.shuffle(test_indices)
+    
+    train_dataset = torch.utils.data.Subset(dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(dataset, val_indices)
+    test_dataset = torch.utils.data.Subset(dataset, test_indices)
+    
+    train_loader = PyGDataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader   = PyGDataLoader(val_dataset,   batch_size=batch_size, shuffle=False)
+    test_loader  = PyGDataLoader(test_dataset,  batch_size=batch_size, shuffle=False)
+    
+    return train_loader, val_loader, test_loader
+
+def old_create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl"):
     dataset = ShiftDataset(root_dir=root_dir, file_name=file_name)
     
     num_graphs = len(dataset)

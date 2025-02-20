@@ -13,7 +13,7 @@ def main():
     config = wandb.config
     
     # 2) Globalen Seed definieren
-    config.seed = 42 #random.randint(1, 100)
+    config.seed = 0 #random.randint(1, 100)
     random.seed(config.seed)
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
@@ -24,7 +24,7 @@ def main():
     config.batch_size = 4
     config.hidden_dim = 64
     config.out_dim = 32
-    config.num_epochs = 200
+    config.num_epochs = 100
     config.lr = 5e-4
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

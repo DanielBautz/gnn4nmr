@@ -48,7 +48,7 @@ def train_one_epoch(model, dataloader, device, optimizer):
                 pred_H = out_dict['H'][valid_mask]
                 target_H = y_dict['H'][valid_mask]
                 mse_H, mae_H = compute_metrics(pred_H, target_H)
-                loss_terms.append(mae_H*10)  # MSE-H geht in den Loss
+                loss_terms.append(mae_H*10)  # MAE-H geht in den Loss
                 total_mse_H += mse_H.item()
                 total_mae_H += mae_H.item()
                 count_H += 1
@@ -60,12 +60,12 @@ def train_one_epoch(model, dataloader, device, optimizer):
                 pred_C = out_dict['C'][valid_mask]
                 target_C = y_dict['C'][valid_mask]
                 mse_C, mae_C = compute_metrics(pred_C, target_C)
-                #loss_terms.append(mse_C)  # MSE-C geht in den Loss
+                loss_terms.append(mae_C)  # MAE-C geht in den Loss
                 total_mse_C += mse_C.item()
                 total_mae_C += mae_C.item()
                 count_C += 1
         
-        # Kombinierten Loss bilden (z.B. Mittelwert der vorhandenen MSEs)
+        # Kombinierten Loss bilden (z.B. Mittelwert der vorhandenen MAEs)
         if len(loss_terms) > 0:
             loss = torch.stack(loss_terms).mean()
             loss.backward()

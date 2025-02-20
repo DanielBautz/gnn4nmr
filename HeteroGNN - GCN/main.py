@@ -22,8 +22,8 @@ def main():
     
     # 3) Hyperparameter
     config.batch_size = 4
-    config.hidden_dim = 64
-    config.out_dim = 32
+    config.hidden_dim = 64 # for encoder
+    config.out_dim = 64
     config.num_epochs = 100
     config.lr = 5e-4
     

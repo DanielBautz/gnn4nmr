@@ -24,11 +24,13 @@ class HeteroGNNModel(nn.Module):
         out_dim: Größe der MLP-Output-Dimension, also Embedding-Dimension
         """
         super().__init__()
+
+        encoder_dim = 64
         
         # 1) Featureencoder pro Knotentyp (MLP)
         self.encoder_dict = nn.ModuleDict()
         for ntype, in_dim in in_dim_dict.items():
-            self.encoder_dict[ntype] = MLPEncoder(in_dim, hidden_dim, out_dim)
+            self.encoder_dict[ntype] = MLPEncoder(in_dim, encoder_dim, out_dim)
         
         # 2) HeteroConv-Schichten (mit GraphConv)
         self.conv1 = HeteroConv({

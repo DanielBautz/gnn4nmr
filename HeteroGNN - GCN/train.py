@@ -148,6 +148,10 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
       - Loggt train/val/test MSE und MAE für beide Targets.
     """
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
+    # Scheduler: Reduziert den LR, wenn sich der Validierungs-Score (hier: val_score) nicht verbessert.
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=10, verbose=True
+    )
     
     best_val_score = float('inf')
     
@@ -161,7 +165,10 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
             model, val_loader, device
         )
         
-        # Loggen
+        # Scheduler Schritt: Reduziere den LR basierend auf dem val_score
+        scheduler.step(val_score)
+        
+        # Loggen der Ergebnisse inkl. des aktuellen LR
         wandb.log({
             "epoch": epoch,
             "train_mse_C": train_mse_C,
@@ -172,7 +179,8 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
             "val_mae_C": val_mae_C,
             "val_mse_H": val_mse_H,
             "val_mae_H": val_mae_H,
-            "val_score": val_score
+            "val_score": val_score,
+            "lr": optimizer.param_groups[0]["lr"]
         })
         
         print(f"Epoch [{epoch+1}/{config.num_epochs}]")

@@ -17,7 +17,7 @@ class MLPEncoder(nn.Module):
         return self.net(x)
 
 class HeteroGNNModel(nn.Module):
-    def __init__(self, in_dim_dict, hidden_dim=32, out_dim=16):
+    def __init__(self, in_dim_dict, hidden_dim=64, out_dim=16):
         """
         in_dim_dict: dict mit { 'H': <int>, 'C': <int>, 'Others': <int> } Feature-Dimensionen
         hidden_dim: Größe der MLP-Hidden und GNN-Hidden-Dimensionen

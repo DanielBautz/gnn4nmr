@@ -34,8 +34,8 @@ def get_h_features(attrs):
     # 2) Atom-Index
     feats.append(float(attrs.get('atom_idx', -1)))
     # 3) Position (x, y, z)
-    pos = attrs.get('pos', (0.0, 0.0, 0.0))
-    feats.extend([pos[0], pos[1], pos[2]])
+    #pos = attrs.get('pos', (0.0, 0.0, 0.0))
+    #feats.extend([pos[0], pos[1], pos[2]])
     # 4) Weitere Attribute
     feats.append(attrs.get('mass', 0.0))
     feats.append(attrs.get('formal_charge', 0.0))
@@ -74,8 +74,8 @@ def get_c_features(attrs):
     # 2) Atom-Index
     feats.append(float(attrs.get('atom_idx', -1)))
     # 3) Position
-    pos = attrs.get('pos', (0.0, 0.0, 0.0))
-    feats.extend([pos[0], pos[1], pos[2]])
+    #pos = attrs.get('pos', (0.0, 0.0, 0.0))
+    #feats.extend([pos[0], pos[1], pos[2]])
     # 4) Weitere Attribute
     feats.append(attrs.get('mass', 0.0))
     feats.append(attrs.get('formal_charge', 0.0))
@@ -121,8 +121,8 @@ def get_others_features(attrs):
     # 2) Atom-Index
     feats.append(float(attrs.get('atom_idx', -1)))
     # 3) Position
-    pos = attrs.get('pos', (0.0, 0.0, 0.0))
-    feats.extend([pos[0], pos[1], pos[2]])
+    #pos = attrs.get('pos', (0.0, 0.0, 0.0))
+    #feats.extend([pos[0], pos[1], pos[2]])
     # 4) Weitere Attribute
     feats.append(attrs.get('mass', 0.0))
     feats.append(attrs.get('formal_charge', 0.0))

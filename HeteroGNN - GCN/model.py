@@ -1,6 +1,8 @@
+# model.py
 import torch
 import torch.nn as nn
-from torch_geometric.nn import HeteroConv, GraphConv
+from torch_geometric.nn import HeteroConv
+from operators import get_conv_operator  # Neuer Import
 
 class MLPEncoder(nn.Module):
     """Einfaches MLP zur Transformation der Rohfeatures in d_model mit Dropout."""
@@ -19,14 +21,27 @@ class MLPEncoder(nn.Module):
         return self.net(x)
 
 class HeteroGNNModel(nn.Module):
-    def __init__(self, in_dim_dict, hidden_dim=32, out_dim=16, dropout_prob=0.1):
+    def __init__(
+        self, 
+        in_dim_dict, 
+        hidden_dim=32, 
+        out_dim=16, 
+        dropout_prob=0.1, 
+        operator_type="GraphConv", 
+        operator_kwargs=None
+    ):
         """
         in_dim_dict: dict mit { 'H': <int>, 'C': <int>, 'Others': <int> } Feature-Dimensionen
         hidden_dim: Größe der MLP-Hidden und GNN-Hidden-Dimensionen
         out_dim: Größe der MLP-Output-Dimension, also Embedding-Dimension
         dropout_prob: Wahrscheinlichkeit für Dropout
+        operator_type: Typ des GNN Operators (z.B. "GraphConv", "GCNConv", "GATConv", "SAGEConv")
+        operator_kwargs: zusätzliche Argumente für den GNN Operator
         """
         super().__init__()
+        
+        if operator_kwargs is None:
+            operator_kwargs = {}
         
         # 1) Featureencoder pro Knotentyp (MLP) mit Dropout
         self.encoder_dict = nn.ModuleDict()
@@ -36,34 +51,26 @@ class HeteroGNNModel(nn.Module):
         # Dropout-Layer für den GNN-Teil
         self.dropout = nn.Dropout(p=dropout_prob)
         
-        # 2) HeteroConv-Schichten (mit GraphConv)
-        self.conv1 = HeteroConv({
-            ('H', 'bond', 'H'): GraphConv(out_dim, out_dim),
-            ('H', 'bond', 'C'): GraphConv(out_dim, out_dim),
-            ('H', 'bond', 'Others'): GraphConv(out_dim, out_dim),
-            
-            ('C', 'bond', 'H'): GraphConv(out_dim, out_dim),
-            ('C', 'bond', 'C'): GraphConv(out_dim, out_dim),
-            ('C', 'bond', 'Others'): GraphConv(out_dim, out_dim),
-            
-            ('Others', 'bond', 'H'): GraphConv(out_dim, out_dim),
-            ('Others', 'bond', 'C'): GraphConv(out_dim, out_dim),
-            ('Others', 'bond', 'Others'): GraphConv(out_dim, out_dim),
-        }, aggr='sum')
+        # 2) HeteroConv-Schichten (mit dem ausgewählten Operator)
+        conv_class = get_conv_operator(operator_type)
         
-        self.conv2 = HeteroConv({
-            ('H', 'bond', 'H'): GraphConv(out_dim, out_dim),
-            ('H', 'bond', 'C'): GraphConv(out_dim, out_dim),
-            ('H', 'bond', 'Others'): GraphConv(out_dim, out_dim),
-            
-            ('C', 'bond', 'H'): GraphConv(out_dim, out_dim),
-            ('C', 'bond', 'C'): GraphConv(out_dim, out_dim),
-            ('C', 'bond', 'Others'): GraphConv(out_dim, out_dim),
-            
-            ('Others', 'bond', 'H'): GraphConv(out_dim, out_dim),
-            ('Others', 'bond', 'C'): GraphConv(out_dim, out_dim),
-            ('Others', 'bond', 'Others'): GraphConv(out_dim, out_dim),
-        }, aggr='sum')
+        def create_conv_layers():
+            relations = [
+                ('H', 'bond', 'H'),
+                ('H', 'bond', 'C'),
+                ('H', 'bond', 'Others'),
+                ('C', 'bond', 'H'),
+                ('C', 'bond', 'C'),
+                ('C', 'bond', 'Others'),
+                ('Others', 'bond', 'H'),
+                ('Others', 'bond', 'C'),
+                ('Others', 'bond', 'Others')
+            ]
+            # Erzeugt für jede Relation eine Instanz des ausgewählten Operators
+            return {rel: conv_class(out_dim, out_dim, **operator_kwargs) for rel in relations}
+        
+        self.conv1 = HeteroConv(create_conv_layers(), aggr='sum')
+        self.conv2 = HeteroConv(create_conv_layers(), aggr='sum')
         
         # 3) Zwei Output-Köpfe für Shift-Vorhersage (Node-Regression) - einmal für H, einmal für C
         self.pred_heads = nn.ModuleDict({

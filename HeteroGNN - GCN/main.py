@@ -13,7 +13,7 @@ def main():
     config = wandb.config
     
     # 2) Globalen Seed definieren
-    config.seed = 0 #random.randint(1, 100)
+    config.seed = 0  # random.randint(1, 100)
     random.seed(config.seed)
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
@@ -22,10 +22,20 @@ def main():
     
     # 3) Hyperparameter
     config.batch_size = 4
-    config.hidden_dim = 32 # for encoder
-    config.out_dim = 64 # for encoder output and GNN
+    config.hidden_dim = 32  # for encoder
+    config.out_dim = 64     # for encoder output and GNN
     config.num_epochs = 100
     config.lr = 5e-4
+    
+    # Neuer Parameter: Operator-Typ für das GNN 
+    if not hasattr(config, "operator_type"):
+        config.operator_type = "GATv2Conv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv","GraphConv"
+
+    # optionale zusätzliche Parameter für den Operator
+    if not hasattr(config, "operator_kwargs"):
+        config.operator_kwargs = {}
+    if config.operator_type == "GATConv" or config.operator_type == "GATv2Conv":
+        config.operator_kwargs['add_self_loops'] = False    
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -46,7 +56,9 @@ def main():
     model = HeteroGNNModel(
         in_dim_dict, 
         hidden_dim=config.hidden_dim, 
-        out_dim=config.out_dim
+        out_dim=config.out_dim,
+        operator_type=config.operator_type,
+        operator_kwargs=config.operator_kwargs
     ).to(device)
     
     # 6) Trainieren

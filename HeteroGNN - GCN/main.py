@@ -29,7 +29,7 @@ def main():
     
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
-        config.operator_type = "GATv2Conv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv","GraphConv"
+        config.operator_type = "GraphConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv","GraphConv", "GATv2Conv"
 
     # optionale zusätzliche Parameter für den Operator
     if not hasattr(config, "operator_kwargs"):

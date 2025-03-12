@@ -8,15 +8,13 @@ def compute_metrics(pred, target):
     mae = F.l1_loss(pred, target)
     return mse, mae
 
-
-def train_one_epoch(model, dataloader, device, optimizer):
+def train_one_epoch(model, dataloader, device, optimizer, config):
     """
     Trainiert über eine Epoche.
     Berechnet separate Metriken für H und C und kombiniert den Loss.
     """
     model.train()
     
-    # Zum Aufsummieren
     total_mse_H, total_mae_H, count_H = 0.0, 0.0, 0
     total_mse_C, total_mae_C, count_C = 0.0, 0.0, 0
     
@@ -24,7 +22,6 @@ def train_one_epoch(model, dataloader, device, optimizer):
         batch_data = batch_data.to(device)
         optimizer.zero_grad()
         
-        # x_dict, y_dict, edge_index_dict erstellen
         x_dict, y_dict = {}, {}
         for ntype in batch_data.node_types:
             x_dict[ntype] = batch_data[ntype].x
@@ -35,10 +32,7 @@ def train_one_epoch(model, dataloader, device, optimizer):
             src, rel, dst = store._key
             edge_index_dict[(src, rel, dst)] = store.edge_index
         
-        # Vorwärtslauf
         out_dict = model(x_dict, edge_index_dict)
-        
-        # MSE/MAE berechnen für H und C
         loss_terms = []
         
         # H
@@ -48,7 +42,7 @@ def train_one_epoch(model, dataloader, device, optimizer):
                 pred_H = out_dict['H'][valid_mask]
                 target_H = y_dict['H'][valid_mask]
                 mse_H, mae_H = compute_metrics(pred_H, target_H)
-                loss_terms.append(mae_H*10)  # MAE-H geht in den Loss
+                loss_terms.append(mae_H * config.loss_weight_H)
                 total_mse_H += mse_H.item()
                 total_mae_H += mae_H.item()
                 count_H += 1
@@ -60,18 +54,16 @@ def train_one_epoch(model, dataloader, device, optimizer):
                 pred_C = out_dict['C'][valid_mask]
                 target_C = y_dict['C'][valid_mask]
                 mse_C, mae_C = compute_metrics(pred_C, target_C)
-                loss_terms.append(mae_C)  # MAE-C geht in den Loss
+                loss_terms.append(mae_C * config.loss_weight_C)
                 total_mse_C += mse_C.item()
                 total_mae_C += mae_C.item()
                 count_C += 1
         
-        # Kombinierten Loss bilden (z.B. Mittelwert der vorhandenen MAEs)
         if len(loss_terms) > 0:
             loss = torch.stack(loss_terms).mean()
             loss.backward()
             optimizer.step()
     
-    # Am Ende der Epoche Mittelwerte pro Typ
     train_mse_H = total_mse_H / count_H if count_H > 0 else 0.0
     train_mae_H = total_mae_H / count_H if count_H > 0 else 0.0
     train_mse_C = total_mse_C / count_C if count_C > 0 else 0.0
@@ -79,11 +71,11 @@ def train_one_epoch(model, dataloader, device, optimizer):
     
     return train_mse_H, train_mae_H, train_mse_C, train_mae_C
 
-
 @torch.no_grad()
-def evaluate(model, dataloader, device):
+def evaluate_with_config(model, dataloader, device, config):
     """
-    Berechnet MSE/MAE für H und C, liefert auch einen 'score' zurück
+    Berechnet MSE/MAE für H und C und liefert auch einen 'val_score' zurück,
+    wobei der Score als gewichteter Durchschnitt der MAEs berechnet wird.
     """
     model.eval()
     
@@ -132,14 +124,8 @@ def evaluate(model, dataloader, device):
     val_mse_C = total_mse_C / count_C if count_C > 0 else 0.0
     val_mae_C = total_mae_C / count_C if count_C > 0 else 0.0
     
-    # Beispiel: Mittelwert beider MSEs als 'val_score' (für "best model")
-    #val_score = (val_mse_H + val_mse_C) / 2.0
-    # Beispiel: Mittelwert beider MAEs als 'val_score' (für "best model")
-    val_score = (val_mae_H*10 + val_mae_C) / 2.0
-    #val_score = val_mae_H
-    
+    val_score = (val_mae_H * config.loss_weight_H + val_mae_C * config.loss_weight_C) / 2.0
     return val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score
-
 
 def train_model(model, train_loader, val_loader, test_loader, device, config):
     """
@@ -147,28 +133,29 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
       - Single-Model, multi-task (H und C).
       - Loggt train/val/test MSE und MAE für beide Targets.
     """
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-    # Scheduler: Reduziert den LR, wenn sich der Validierungs-Score (hier: val_score) nicht verbessert.
+    if config.optimizer == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    elif config.optimizer == "SGD":
+        optimizer = torch.optim.SGD(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    else:
+        raise ValueError(f"Unsupported optimizer: {config.optimizer}")
+        
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=10, verbose=True
+        optimizer, mode='min', factor=config.scheduler_factor, patience=config.scheduler_patience, verbose=True
     )
     
     best_val_score = float('inf')
     
     for epoch in range(config.num_epochs):
-        # Training
         train_mse_H, train_mae_H, train_mse_C, train_mae_C = train_one_epoch(
-            model, train_loader, device, optimizer
+            model, train_loader, device, optimizer, config
         )
-        # Validation
-        val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score = evaluate(
-            model, val_loader, device
+        val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score = evaluate_with_config(
+            model, val_loader, device, config
         )
         
-        # Scheduler Schritt: Reduziere den LR basierend auf dem val_score
         scheduler.step(val_score)
         
-        # Loggen der Ergebnisse inkl. des aktuellen LR
         wandb.log({
             "epoch": epoch,
             "train_mse_C": train_mse_C,
@@ -189,14 +176,12 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         print(f"  Val     => H: MSE={val_mse_H:.4f}, MAE={val_mae_H:.4f} |"
               f"  C: MSE={val_mse_C:.4f}, MAE={val_mae_C:.4f} | val_score={val_score:.4f}")
         
-        # Bestes Modell speichern
         if val_score < best_val_score:
             best_val_score = val_score
             torch.save(model.state_dict(), "best_model.pt")
     
-    # Test-Phase mit best_model
     model.load_state_dict(torch.load("best_model.pt"))
-    test_mse_H, test_mae_H, test_mse_C, test_mae_C, _ = evaluate(model, test_loader, device)
+    test_mse_H, test_mae_H, test_mse_C, test_mae_C, _ = evaluate_with_config(model, test_loader, device, config)
     
     wandb.log({
         "test_mse_C": test_mse_C,

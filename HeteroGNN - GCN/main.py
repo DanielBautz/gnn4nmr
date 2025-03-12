@@ -1,4 +1,3 @@
-# main.py
 import random
 import numpy as np
 import torch
@@ -22,16 +21,28 @@ def main():
     
     # 3) Hyperparameter
     config.batch_size = 4
-    config.hidden_dim = 32  # for encoder
-    config.out_dim = 64     # for encoder output and GNN
+    config.hidden_dim = 32      # für den Encoder
+    config.out_dim = 64         # für Encoder-Output und GNN
     config.num_epochs = 100
     config.lr = 5e-4
-    
+
+    # Neue Konfigurationsvariablen
+    config.split_ratio = (0.8, 0.1, 0.1)
+    config.encoder_dropout = 0.1
+    config.gnnlayer_dropout = 0.1
+    config.num_gnn_layers = 2
+    config.optimizer = "Adam"   # Optionen: "Adam", "SGD", etc.
+    config.weight_decay = 0.0
+    config.scheduler_factor = 0.5
+    config.scheduler_patience = 10
+    config.loss_weight_H = 10
+    config.loss_weight_C = 1
+
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
-        config.operator_type = "GraphConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv","GraphConv", "GATv2Conv"
+        config.operator_type = "GraphConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv"
 
-    # optionale zusätzliche Parameter für den Operator
+    # Optionale zusätzliche Parameter für den Operator
     if not hasattr(config, "operator_kwargs"):
         config.operator_kwargs = {}
     if config.operator_type == "GATConv" or config.operator_type == "GATv2Conv":
@@ -39,9 +50,10 @@ def main():
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # 4) Dataloaders
+    # 4) Dataloaders (mit split_ratio aus config)
     train_loader, val_loader, test_loader = create_dataloaders(
-        batch_size=config.batch_size
+        batch_size=config.batch_size, 
+        split_ratio=config.split_ratio
     )
     
     # 5) Modell erstellen
@@ -57,6 +69,9 @@ def main():
         in_dim_dict, 
         hidden_dim=config.hidden_dim, 
         out_dim=config.out_dim,
+        encoder_dropout=config.encoder_dropout,
+        gnnlayer_dropout=config.gnnlayer_dropout,
+        num_gnn_layers=config.num_gnn_layers,
         operator_type=config.operator_type,
         operator_kwargs=config.operator_kwargs
     ).to(device)

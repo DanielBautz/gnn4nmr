@@ -1,8 +1,7 @@
-# model.py
 import torch
 import torch.nn as nn
 from torch_geometric.nn import HeteroConv
-from operators import get_conv_operator  # Neuer Import
+from operators import get_conv_operator
 
 class MLPEncoder(nn.Module):
     """Einfaches MLP zur Transformation der Rohfeatures in d_model mit Dropout."""
@@ -26,7 +25,9 @@ class HeteroGNNModel(nn.Module):
         in_dim_dict, 
         hidden_dim=32, 
         out_dim=16, 
-        dropout_prob=0.1, 
+        encoder_dropout=0.1,
+        gnnlayer_dropout=0.1,
+        num_gnn_layers=2,
         operator_type="GraphConv", 
         operator_kwargs=None
     ):
@@ -34,8 +35,10 @@ class HeteroGNNModel(nn.Module):
         in_dim_dict: dict mit { 'H': <int>, 'C': <int>, 'Others': <int> } Feature-Dimensionen
         hidden_dim: Größe der MLP-Hidden und GNN-Hidden-Dimensionen
         out_dim: Größe der MLP-Output-Dimension, also Embedding-Dimension
-        dropout_prob: Wahrscheinlichkeit für Dropout
-        operator_type: Typ des GNN Operators (z.B. "GraphConv", "GCNConv", "GATConv", "SAGEConv")
+        encoder_dropout: Dropout-Wahrscheinlichkeit in den MLP-Encodern
+        gnnlayer_dropout: Dropout-Wahrscheinlichkeit nach jeder HeteroConv-Schicht
+        num_gnn_layers: Anzahl der HeteroConv-Schichten
+        operator_type: Typ des GNN Operators (z.B. "GraphConv", "GCNConv", "GATConv", "SAGEConv", "GATv2Conv")
         operator_kwargs: zusätzliche Argumente für den GNN Operator
         """
         super().__init__()
@@ -43,17 +46,15 @@ class HeteroGNNModel(nn.Module):
         if operator_kwargs is None:
             operator_kwargs = {}
         
-        # 1) Featureencoder pro Knotentyp (MLP) mit Dropout
+        # 1) Featureencoder pro Knotentyp mit encoder_dropout
         self.encoder_dict = nn.ModuleDict()
         for ntype, in_dim in in_dim_dict.items():
-            self.encoder_dict[ntype] = MLPEncoder(in_dim, hidden_dim, out_dim, dropout_prob=dropout_prob)
+            self.encoder_dict[ntype] = MLPEncoder(in_dim, hidden_dim, out_dim, dropout_prob=encoder_dropout)
         
-        # Dropout-Layer für den GNN-Teil
-        self.dropout = nn.Dropout(p=dropout_prob)
+        # Dropout-Layer für GNN-Schichten
+        self.gnn_dropout = nn.Dropout(p=gnnlayer_dropout)
         
-        # 2) HeteroConv-Schichten (mit dem ausgewählten Operator)
         conv_class = get_conv_operator(operator_type)
-        
         def create_conv_layers():
             relations = [
                 ('H', 'bond', 'H'),
@@ -66,38 +67,29 @@ class HeteroGNNModel(nn.Module):
                 ('Others', 'bond', 'C'),
                 ('Others', 'bond', 'Others')
             ]
-            # Erzeugt für jede Relation eine Instanz des ausgewählten Operators
             return {rel: conv_class(out_dim, out_dim, **operator_kwargs) for rel in relations}
         
-        self.conv1 = HeteroConv(create_conv_layers(), aggr='sum')
-        self.conv2 = HeteroConv(create_conv_layers(), aggr='sum')
+        # Erstelle num_gnn_layers HeteroConv-Schichten
+        self.convs = nn.ModuleList([HeteroConv(create_conv_layers(), aggr='sum') for _ in range(num_gnn_layers)])
         
-        # 3) Zwei Output-Köpfe für Shift-Vorhersage (Node-Regression) - einmal für H, einmal für C
+        # Zwei Output-Köpfe für Shift-Vorhersage (Node-Regression)
         self.pred_heads = nn.ModuleDict({
-            'H': nn.Sequential(nn.Linear(out_dim, 1)), 
-            'C': nn.Sequential(nn.Linear(out_dim, 1))
+            'H': nn.Linear(out_dim, 1), 
+            'C': nn.Linear(out_dim, 1)
         })
         
     def forward(self, x_dict, edge_index_dict):
-        """
-        x_dict: Dict { 'H': [num_H, in_dim], 'C': [num_C, in_dim], 'Others': [num_O, in_dim] }
-        edge_index_dict: Dict mit Kanten pro Relation
-        """
-        # (1) Rohfeatures -> MLP-Encoder (Dropout ist in den Encodern integriert)
+        # (1) Rohfeatures -> MLP-Encoder
         for ntype, x in x_dict.items():
             x_dict[ntype] = self.encoder_dict[ntype](x)
         
-        # (2) Erste HeteroConv-Schicht + ReLU & Dropout
-        x_dict = self.conv1(x_dict, edge_index_dict)
-        for ntype in x_dict:
-            x_dict[ntype] = self.dropout(nn.ReLU()(x_dict[ntype]))
+        # (2) Mehrere HeteroConv-Schichten
+        for conv in self.convs:
+            x_dict = conv(x_dict, edge_index_dict)
+            for ntype in x_dict:
+                x_dict[ntype] = self.gnn_dropout(nn.ReLU()(x_dict[ntype]))
         
-        # (3) Zweite HeteroConv-Schicht + ReLU & Dropout
-        x_dict = self.conv2(x_dict, edge_index_dict)
-        for ntype in x_dict:
-            x_dict[ntype] = self.dropout(nn.ReLU()(x_dict[ntype]))
-        
-        # (4) Vorhersagen für H und C
+        # (3) Vorhersagen für H und C
         out_dict = {}
         for ntype in x_dict:
             if ntype in self.pred_heads:

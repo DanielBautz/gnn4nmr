@@ -124,7 +124,6 @@ class OldShiftDataset(Dataset):
         h_shifts, c_shifts, o_shifts = [], [], []
         node_idx_map = {}
 
-        # (Feature-Extraktion analog – siehe Originalcode)
         for node in nx_g.nodes():
             attrs = nx_g.nodes[node]
             element = attrs["element"]
@@ -152,17 +151,17 @@ class OldShiftDataset(Dataset):
         c_x = torch.tensor(c_features, dtype=torch.float)
         o_x = torch.tensor(o_features, dtype=torch.float)
         
-        h_y = torch.tensor(h_shifts, dtype=torch.float).view(-1, 1) if len(h_shifts) else torch.empty((0,1))
-        c_y = torch.tensor(c_shifts, dtype=torch.float).view(-1, 1) if len(c_shifts) else torch.empty((0,1))
-        o_y = torch.tensor(o_shifts, dtype=torch.float).view(-1, 1) if len(o_shifts) else torch.empty((0,1))
+        h_y = torch.tensor(h_shifts, dtype=torch.float).view(-1, 1) if h_shifts else torch.empty((0,1))
+        c_y = torch.tensor(c_shifts, dtype=torch.float).view(-1, 1) if c_shifts else torch.empty((0,1))
+        o_y = torch.tensor(o_shifts, dtype=torch.float).view(-1, 1) if o_shifts else torch.empty((0,1))
         
-        if len(h_nodes) > 0:
+        if h_nodes:
             data['H'].x = h_x
             data['H'].y = h_y
-        if len(c_nodes) > 0:
+        if c_nodes:
             data['C'].x = c_x
             data['C'].y = c_y
-        if len(o_nodes) > 0:
+        if o_nodes:
             data['Others'].x = o_x
             data['Others'].y = o_y
         
@@ -215,8 +214,7 @@ class OldShiftDataset(Dataset):
         
         for rel, (row, col) in edge_index_dict.items():
             data[rel].edge_index = torch.tensor([row, col], dtype=torch.long)
-            edge_feats = torch.tensor(edge_attr_dict[rel], dtype=torch.float)
-            data[rel].edge_attr = edge_feats
+            data[rel].edge_attr = torch.tensor(edge_attr_dict[rel], dtype=torch.float)
         
         return data
 
@@ -265,10 +263,8 @@ class ShiftDataset(Dataset):
     
         def get_h_features_local(attrs):
             return get_h_features(attrs)
-        
         def get_c_features_local(attrs):
             return get_c_features(attrs)
-        
         def get_others_features_local(attrs):
             return get_others_features(attrs)
         
@@ -322,17 +318,17 @@ class ShiftDataset(Dataset):
         else:
             o_x = torch.empty((0, 13))
         
-        h_y = torch.tensor(h_shifts, dtype=torch.float).view(-1, 1) if len(h_shifts) else torch.empty((0,1))
-        c_y = torch.tensor(c_shifts, dtype=torch.float).view(-1, 1) if len(c_shifts) else torch.empty((0,1))
-        o_y = torch.tensor(o_shifts, dtype=torch.float).view(-1, 1) if len(o_shifts) else torch.empty((0,1))
+        h_y = torch.tensor(h_shifts, dtype=torch.float).view(-1, 1) if h_shifts else torch.empty((0,1))
+        c_y = torch.tensor(c_shifts, dtype=torch.float).view(-1, 1) if c_shifts else torch.empty((0,1))
+        o_y = torch.tensor(o_shifts, dtype=torch.float).view(-1, 1) if o_shifts else torch.empty((0,1))
         
-        if len(h_nodes) > 0:
+        if h_nodes:
             data['H'].x = h_x
             data['H'].y = h_y
-        if len(c_nodes) > 0:
+        if c_nodes:
             data['C'].x = c_x
             data['C'].y = c_y
-        if len(o_nodes) > 0:
+        if o_nodes:
             data['Others'].x = o_x
             data['Others'].y = o_y
         
@@ -385,23 +381,19 @@ class ShiftDataset(Dataset):
         
         for rel, (row, col) in edge_index_dict.items():
             data[rel].edge_index = torch.tensor([row, col], dtype=torch.long)
-            edge_feats = torch.tensor(edge_attr_dict[rel], dtype=torch.float)
-            data[rel].edge_attr = edge_feats
+            data[rel].edge_attr = torch.tensor(edge_attr_dict[rel], dtype=torch.float)
         
         return data
 
 def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl", split_ratio=(0.8, 0.1, 0.1)):
     dataset = ShiftDataset(root_dir=root_dir, file_name=file_name)
     
-    # Gruppiere Graphen nach dem 'compound'-Attribut (in den Graph-Attributen)
     compound_to_indices = {}
     for idx, nx_g in enumerate(dataset.nx_graphs):
         compound = nx_g.graph.get("compound", None)
         if compound is None:
             compound = "unknown"
-        if compound not in compound_to_indices:
-            compound_to_indices[compound] = []
-        compound_to_indices[compound].append(idx)
+        compound_to_indices.setdefault(compound, []).append(idx)
     
     compounds = list(compound_to_indices.keys())
     random.shuffle(compounds)
@@ -414,28 +406,83 @@ def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl"
     val_compounds = compounds[train_end:val_end]
     test_compounds = compounds[val_end:]
     
-    train_indices = []
-    for comp in train_compounds:
-        train_indices.extend(compound_to_indices[comp])
-    
-    val_indices = []
-    for comp in val_compounds:
-        val_indices.extend(compound_to_indices[comp])
-    
-    test_indices = []
-    for comp in test_compounds:
-        test_indices.extend(compound_to_indices[comp])
+    train_indices = [i for comp in train_compounds for i in compound_to_indices[comp]]
+    val_indices   = [i for comp in val_compounds   for i in compound_to_indices[comp]]
+    test_indices  = [i for comp in test_compounds  for i in compound_to_indices[comp]]
     
     random.shuffle(train_indices)
     random.shuffle(val_indices)
     random.shuffle(test_indices)
     
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
-    val_dataset = torch.utils.data.Subset(dataset, val_indices)
-    test_dataset = torch.utils.data.Subset(dataset, test_indices)
+    val_dataset   = torch.utils.data.Subset(dataset, val_indices)
+    test_dataset  = torch.utils.data.Subset(dataset, test_indices)
     
     train_loader = PyGDataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader   = PyGDataLoader(val_dataset,   batch_size=batch_size, shuffle=False)
     test_loader  = PyGDataLoader(test_dataset,  batch_size=batch_size, shuffle=False)
     
     return train_loader, val_loader, test_loader
+
+def create_kfold_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl", k_folds=5, split_ratio=(0.8, 0.1, 0.1)):
+    """
+    Erzeugt k-Fold-Dataloaders, wobei die Graphen nach dem Compound-Attribut gruppiert werden.
+    Es wird sichergestellt, dass Graphen mit derselben Compound-Nummer nicht in unterschiedlichen Splits landen.
+    
+    Für jeden Fold wird der jeweilige Test-Fold als Testmenge verwendet.
+    Die restlichen Compounds werden nach dem Verhältnis aus split_ratio in Training und Validierung aufgeteilt.
+    """
+    dataset = ShiftDataset(root_dir=root_dir, file_name=file_name)
+    
+    compound_to_indices = {}
+    for idx, nx_g in enumerate(dataset.nx_graphs):
+        compound = nx_g.graph.get("compound", None)
+        if compound is None:
+            compound = "unknown"
+        compound_to_indices.setdefault(compound, []).append(idx)
+    
+    compounds = list(compound_to_indices.keys())
+    random.shuffle(compounds)
+    
+    folds = []
+    fold_size = len(compounds) // k_folds
+    remainder = len(compounds) % k_folds
+    start = 0
+    for i in range(k_folds):
+        extra = 1 if i < remainder else 0
+        end = start + fold_size + extra
+        folds.append(compounds[start:end])
+        start = end
+    
+    total_ratio = split_ratio[0] + split_ratio[1]
+    train_frac = split_ratio[0] / total_ratio if total_ratio > 0 else 1.0
+    
+    dataloaders_per_fold = []
+    for i in range(k_folds):
+        test_compounds = folds[i]
+        train_val_compounds = [c for j, fold in enumerate(folds) if j != i for c in fold]
+        random.shuffle(train_val_compounds)
+        num_train_val = len(train_val_compounds)
+        num_train = int(train_frac * num_train_val)
+        train_compounds = train_val_compounds[:num_train]
+        val_compounds = train_val_compounds[num_train:]
+        
+        train_indices = [i for comp in train_compounds for i in compound_to_indices[comp]]
+        val_indices   = [i for comp in val_compounds   for i in compound_to_indices[comp]]
+        test_indices  = [i for comp in test_compounds  for i in compound_to_indices[comp]]
+        
+        random.shuffle(train_indices)
+        random.shuffle(val_indices)
+        random.shuffle(test_indices)
+        
+        train_dataset = torch.utils.data.Subset(dataset, train_indices)
+        val_dataset   = torch.utils.data.Subset(dataset, val_indices)
+        test_dataset  = torch.utils.data.Subset(dataset, test_indices)
+        
+        train_loader = PyGDataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader   = PyGDataLoader(val_dataset,   batch_size=batch_size, shuffle=False)
+        test_loader  = PyGDataLoader(test_dataset,  batch_size=batch_size, shuffle=False)
+        
+        dataloaders_per_fold.append((train_loader, val_loader, test_loader))
+    
+    return dataloaders_per_fold

@@ -9,10 +9,6 @@ def compute_metrics(pred, target):
     return mse, mae
 
 def train_one_epoch(model, dataloader, device, optimizer, config):
-    """
-    Trainiert über eine Epoche.
-    Berechnet separate Metriken für H und C und kombiniert den Loss.
-    """
     model.train()
     
     total_mse_H, total_mae_H, count_H = 0.0, 0.0, 0
@@ -72,11 +68,7 @@ def train_one_epoch(model, dataloader, device, optimizer, config):
     return train_mse_H, train_mae_H, train_mse_C, train_mae_C
 
 @torch.no_grad()
-def evaluate_with_config(model, dataloader, device, config):
-    """
-    Berechnet MSE/MAE für H und C und liefert auch einen 'val_score' zurück,
-    wobei der Score als gewichteter Durchschnitt der MAEs berechnet wird.
-    """
+def evaluate(model, dataloader, device, config):
     model.eval()
     
     total_mse_H, total_mae_H, count_H = 0.0, 0.0, 0
@@ -127,12 +119,7 @@ def evaluate_with_config(model, dataloader, device, config):
     val_score = (val_mae_H * config.loss_weight_H + val_mae_C * config.loss_weight_C) / 2.0
     return val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score
 
-def train_model(model, train_loader, val_loader, test_loader, device, config):
-    """
-    Haupttrainingsschleife:
-      - Single-Model, multi-task (H und C).
-      - Loggt train/val/test MSE und MAE für beide Targets.
-    """
+def train_model(model, train_loader, val_loader, test_loader, device, config, fold=None):
     if config.optimizer == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     elif config.optimizer == "SGD":
@@ -145,12 +132,15 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
     )
     
     best_val_score = float('inf')
+    # Bestes Modell wird in einer fold-spezifischen Datei gespeichert
+    model_save_path = f"best_model_fold_{fold}.pt" if fold is not None else "best_model.pt"
     
     for epoch in range(config.num_epochs):
         train_mse_H, train_mae_H, train_mse_C, train_mae_C = train_one_epoch(
             model, train_loader, device, optimizer, config
         )
-        val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score = evaluate_with_config(
+
+        val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score = evaluate(
             model, val_loader, device, config
         )
         
@@ -178,10 +168,10 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         
         if val_score < best_val_score:
             best_val_score = val_score
-            torch.save(model.state_dict(), "best_model.pt")
+            torch.save(model.state_dict(), model_save_path)
     
-    model.load_state_dict(torch.load("best_model.pt"))
-    test_mse_H, test_mae_H, test_mse_C, test_mae_C, _ = evaluate_with_config(model, test_loader, device, config)
+    model.load_state_dict(torch.load(model_save_path))
+    test_mse_H, test_mae_H, test_mse_C, test_mae_C, _ = evaluate(model, test_loader, device, config)
     
     wandb.log({
         "test_mse_C": test_mse_C,
@@ -193,4 +183,10 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
     print(f"** Test ** => H: MSE={test_mse_H:.4f}, MAE={test_mae_H:.4f} |"
           f"  C: MSE={test_mse_C:.4f}, MAE={test_mae_C:.4f}")
     
-    return model
+    metrics = {
+        "test_mse_H": test_mse_H,
+        "test_mae_H": test_mae_H,
+        "test_mse_C": test_mse_C,
+        "test_mae_C": test_mae_C
+    }
+    return model, metrics

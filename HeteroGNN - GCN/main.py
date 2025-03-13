@@ -62,6 +62,7 @@ def main():
     for ntype in example_data.node_types:
         if example_data[ntype].x is not None:
             in_dim_dict[ntype] = example_data[ntype].x.size(-1)
+            print(f"Node type {ntype} has input dimension {in_dim_dict[ntype]}")
         else:
             in_dim_dict[ntype] = 0
     

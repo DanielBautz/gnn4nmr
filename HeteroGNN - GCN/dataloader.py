@@ -114,6 +114,7 @@ class ShiftDataset(Dataset):
         self.norm_stats = {}
         feat_collect = {'H': [], 'C': [], 'Others': []}
         
+        # Sammle Knotendaten zur Normalisierung (nur Features ab Index 13)
         for nx_g in self.nx_graphs:
             for node in nx_g.nodes():
                 attrs = nx_g.nodes[node]
@@ -136,10 +137,23 @@ class ShiftDataset(Dataset):
                 self.norm_stats[ntype] = (mean, std)
             else:
                 self.norm_stats[ntype] = (None, None)
-    
+        
+        # Berechne Normalisierungsstatistiken für das Kantenfeature "length"
+        self.edge_lengths = []
+        for nx_g in self.nx_graphs:
+            for u, v in nx_g.edges():
+                bond_data = nx_g[u][v]
+                self.edge_lengths.append(bond_data.get("length", 0.0))
+        if self.edge_lengths:
+            self.edge_length_mean = np.mean(self.edge_lengths)
+            self.edge_length_std = np.std(self.edge_lengths)
+        else:
+            self.edge_length_mean = 0.0
+            self.edge_length_std = 1.0
+
     def __len__(self):
         return len(self.nx_graphs)
-    
+
     def __getitem__(self, idx):
         nx_g = self.nx_graphs[idx]
         data = HeteroData()
@@ -157,6 +171,7 @@ class ShiftDataset(Dataset):
         def get_others_features_local(attrs):
             return get_others_features(attrs)
         
+        # Knoten und ihre Features sowie Shift-Ziele extrahieren
         for node in nx_g.nodes():
             attrs = nx_g.nodes[node]
             element = attrs["element"]
@@ -180,6 +195,7 @@ class ShiftDataset(Dataset):
                 feats = get_others_features_local(attrs)
                 o_features.append(feats)
         
+        # Normalisierung der Knotendaten (nur ab Spalte 13, da die One-Hot-Codierung erhalten bleiben soll)
         if h_features:
             h_features = np.array(h_features, dtype=np.float32)
             mean, std = self.norm_stats['H']
@@ -233,6 +249,7 @@ class ShiftDataset(Dataset):
             edge_index_dict[rel][1].append(dst_id)
             edge_attr_dict[rel].append(bond_feat)
         
+        # Integriere auch das "length"-Feature in die Kantenfeatures
         def get_bond_features(bond_data):
             bt = bond_data.get('bond_type', 'SINGLE')
             bt_val = 1.0 if bt == 'SINGLE' else 2.0 if bt == 'DOUBLE' else 3.0 if bt == 'TRIPLE' else 0.0
@@ -240,11 +257,15 @@ class ShiftDataset(Dataset):
             bd = bond_data.get('bond_dir', 'NONE')
             bd_val = 0.0 if bd == 'NONE' else 1.0 if bd == 'ENDUPRIGHT' else 0.5
             bo = bond_data.get('bond_order', 1.0)
-            return [bt_val, is_arom, bd_val, bo]
+            length = bond_data.get('length', 0.0)  # Neues Feature
+            return [bt_val, is_arom, bd_val, bo, length]
         
+        # Extrahiere Kanten (bidirektional) und normalisiere das "length"-Feature
         for u, v in nx_g.edges():
             bond_data = nx_g[u][v]
             bond_feat = get_bond_features(bond_data)
+            # Normalisierung: Subtrahiere Mittelwert und dividiere durch Std
+            bond_feat[-1] = (bond_feat[-1] - self.edge_length_mean) / (self.edge_length_std + 1e-6)
             u_element = nx_g.nodes[u]["element"]
             v_element = nx_g.nodes[v]["element"]
             if u_element == "H":
@@ -268,6 +289,7 @@ class ShiftDataset(Dataset):
             add_edge(u_type, v_type, u_idx, v_idx, bond_feat)
             add_edge(v_type, u_type, v_idx, u_idx, bond_feat)
         
+        # Konvertiere Kanteninformationen in Tensors
         for rel, (row, col) in edge_index_dict.items():
             data[rel].edge_index = torch.tensor([row, col], dtype=torch.long)
             edge_feats = torch.tensor(edge_attr_dict[rel], dtype=torch.float)

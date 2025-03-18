@@ -40,7 +40,7 @@ def main():
 
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
-        config.operator_type = "GraphConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv" 
+        config.operator_type = "GINEConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv" 
 
     # Optionale zusätzliche Parameter für den Operator
     if not hasattr(config, "operator_kwargs"):
@@ -74,7 +74,8 @@ def main():
         gnnlayer_dropout=config.gnnlayer_dropout,
         num_gnn_layers=config.num_gnn_layers,
         operator_type=config.operator_type,
-        operator_kwargs=config.operator_kwargs
+        operator_kwargs=config.operator_kwargs,
+        edge_in_dim=5
     ).to(device)
     
     # 6) Trainieren

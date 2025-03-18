@@ -30,7 +30,7 @@ class HeteroGNNModel(nn.Module):
         num_gnn_layers=2,
         operator_type="GraphConv", 
         operator_kwargs=None,
-        edge_in_dim=5  # Dimension der rohen Kantenfeatures, z.B. 4
+        edge_in_dim=10  # Dimension der rohen Kantenfeatures, z.B. 4
     ):
         """
         in_dim_dict: dict mit { 'H': <int>, 'C': <int>, 'Others': <int> } Feature-Dimensionen

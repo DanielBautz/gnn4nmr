@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 from torch_geometric.data import HeteroData
 from torch_geometric.loader import DataLoader as PyGDataLoader
 
-# Liste aller möglichen Elemente, die wir als One-Hot differenzieren möchten
+# Liste aller möglichen Elemente für One-Hot-Encoding
 ALL_ELEMENTS = [
     "H", "C", "Li", "B", "N", "O", 
     "Na", "Mg", "Al", "Si", "P", "S", "Cl"
@@ -106,50 +106,70 @@ def get_others_features(attrs):
     return feats
 
 class ShiftDataset(Dataset):
-    def __init__(self, root_dir="data", file_name="all_graphs.pkl"):
+    def __init__(self, root_dir="data", file_name="all_graphs.pkl", 
+                 normalize_node_features=True, normalize_edge_features=True):
         super().__init__()
         self.file_path = os.path.join(root_dir, file_name)
         with open(self.file_path, "rb") as f:
             self.nx_graphs = pickle.load(f)
-        self.norm_stats = {}
-        feat_collect = {'H': [], 'C': [], 'Others': []}
         
-        # Sammle Knotendaten zur Normalisierung (nur Features ab Index 13)
-        for nx_g in self.nx_graphs:
-            for node in nx_g.nodes():
-                attrs = nx_g.nodes[node]
-                element = attrs["element"]
-                if element == "H":
-                    feats = get_h_features(attrs)
-                    feat_collect['H'].append(feats[13:])
-                elif element == "C":
-                    feats = get_c_features(attrs)
-                    feat_collect['C'].append(feats[13:])
+        self.normalize_node_features = normalize_node_features
+        self.normalize_edge_features = normalize_edge_features
+        
+        # Node Normalisierung: Berechne global Normalisierungsstatistiken für die kontinuierlichen Features (ab Index 13)
+        if self.normalize_node_features:
+            self.norm_stats = {}
+            feat_collect = {'H': [], 'C': [], 'Others': []}
+            for nx_g in self.nx_graphs:
+                for node in nx_g.nodes():
+                    attrs = nx_g.nodes[node]
+                    element = attrs["element"]
+                    if element == "H":
+                        feats = get_h_features(attrs)
+                        feat_collect['H'].append(feats[13:])
+                    elif element == "C":
+                        feats = get_c_features(attrs)
+                        feat_collect['C'].append(feats[13:])
+                    else:
+                        feats = get_others_features(attrs)
+                        feat_collect['Others'].append(feats[13:])
+            for ntype in feat_collect:
+                if feat_collect[ntype]:
+                    arr = np.array(feat_collect[ntype])
+                    mean = arr.mean(axis=0)
+                    std = arr.std(axis=0)
+                    self.norm_stats[ntype] = (mean, std)
                 else:
-                    feats = get_others_features(attrs)
-                    feat_collect['Others'].append(feats[13:])
+                    self.norm_stats[ntype] = (None, None)
+        else:
+            self.norm_stats = None
         
-        for ntype in feat_collect:
-            if feat_collect[ntype]:
-                arr = np.array(feat_collect[ntype])
-                mean = arr.mean(axis=0)
-                std = arr.std(axis=0)
-                self.norm_stats[ntype] = (mean, std)
+        # Edge Normalisierung: Für die ordinalen Features bond_order und length
+        if self.normalize_edge_features:
+            self.edge_lengths = []
+            self.edge_orders = []
+            for nx_g in self.nx_graphs:
+                for u, v in nx_g.edges():
+                    bond_data = nx_g[u][v]
+                    self.edge_lengths.append(bond_data.get("length", 0.0))
+                    self.edge_orders.append(bond_data.get("bond_order", 1.0))
+            if self.edge_lengths:
+                self.edge_length_mean = np.mean(self.edge_lengths)
+                self.edge_length_std = np.std(self.edge_lengths)
             else:
-                self.norm_stats[ntype] = (None, None)
-        
-        # Berechne Normalisierungsstatistiken für das Kantenfeature "length"
-        self.edge_lengths = []
-        for nx_g in self.nx_graphs:
-            for u, v in nx_g.edges():
-                bond_data = nx_g[u][v]
-                self.edge_lengths.append(bond_data.get("length", 0.0))
-        if self.edge_lengths:
-            self.edge_length_mean = np.mean(self.edge_lengths)
-            self.edge_length_std = np.std(self.edge_lengths)
+                self.edge_length_mean = 0.0
+                self.edge_length_std = 1.0
+            if self.edge_orders:
+                self.edge_order_mean = np.mean(self.edge_orders)
+                self.edge_order_std = np.std(self.edge_orders)
+            else:
+                self.edge_order_mean = 0.0
+                self.edge_order_std = 1.0
         else:
             self.edge_length_mean = 0.0
             self.edge_length_std = 1.0
+            self.edge_order_mean = 0.0
+            self.edge_order_std = 1.0
 
     def __len__(self):
         return len(self.nx_graphs)
@@ -171,7 +191,7 @@ class ShiftDataset(Dataset):
         def get_others_features_local(attrs):
             return get_others_features(attrs)
         
-        # Knoten und ihre Features sowie Shift-Ziele extrahieren
+        # Extrahiere Knoten und ihre Zielwerte
         for node in nx_g.nodes():
             attrs = nx_g.nodes[node]
             element = attrs["element"]
@@ -195,45 +215,48 @@ class ShiftDataset(Dataset):
                 feats = get_others_features_local(attrs)
                 o_features.append(feats)
         
-        # Normalisierung der Knotendaten (nur ab Spalte 13, da die One-Hot-Codierung erhalten bleiben soll)
+        # Wende optionale Normalisierung für Knotendaten an (nur die kontinuierlichen Features ab Index 13)
         if h_features:
             h_features = np.array(h_features, dtype=np.float32)
-            mean, std = self.norm_stats['H']
-            if mean is not None:
-                h_features[:, 13:] = (h_features[:, 13:] - mean) / (std + 1e-6)
+            if self.normalize_node_features:
+                mean, std = self.norm_stats['H']
+                if mean is not None:
+                    h_features[:, 13:] = (h_features[:, 13:] - mean) / (std + 1e-6)
             h_x = torch.tensor(h_features, dtype=torch.float)
         else:
             h_x = torch.empty((0, 13))
         
         if c_features:
             c_features = np.array(c_features, dtype=np.float32)
-            mean, std = self.norm_stats['C']
-            if mean is not None:
-                c_features[:, 13:] = (c_features[:, 13:] - mean) / (std + 1e-6)
+            if self.normalize_node_features:
+                mean, std = self.norm_stats['C']
+                if mean is not None:
+                    c_features[:, 13:] = (c_features[:, 13:] - mean) / (std + 1e-6)
             c_x = torch.tensor(c_features, dtype=torch.float)
         else:
             c_x = torch.empty((0, 13))
         
         if o_features:
             o_features = np.array(o_features, dtype=np.float32)
-            mean, std = self.norm_stats['Others']
-            if mean is not None:
-                o_features[:, 13:] = (o_features[:, 13:] - mean) / (std + 1e-6)
+            if self.normalize_node_features:
+                mean, std = self.norm_stats['Others']
+                if mean is not None:
+                    o_features[:, 13:] = (o_features[:, 13:] - mean) / (std + 1e-6)
             o_x = torch.tensor(o_features, dtype=torch.float)
         else:
             o_x = torch.empty((0, 13))
         
-        h_y = torch.tensor(h_shifts, dtype=torch.float).view(-1, 1) if len(h_shifts) else torch.empty((0,1))
-        c_y = torch.tensor(c_shifts, dtype=torch.float).view(-1, 1) if len(c_shifts) else torch.empty((0,1))
-        o_y = torch.tensor(o_shifts, dtype=torch.float).view(-1, 1) if len(o_shifts) else torch.empty((0,1))
+        h_y = torch.tensor(h_shifts, dtype=torch.float).view(-1, 1) if h_shifts else torch.empty((0, 1))
+        c_y = torch.tensor(c_shifts, dtype=torch.float).view(-1, 1) if c_shifts else torch.empty((0, 1))
+        o_y = torch.tensor(o_shifts, dtype=torch.float).view(-1, 1) if o_shifts else torch.empty((0, 1))
         
-        if len(h_nodes) > 0:
+        if h_nodes:
             data['H'].x = h_x
             data['H'].y = h_y
-        if len(c_nodes) > 0:
+        if c_nodes:
             data['C'].x = c_x
             data['C'].y = c_y
-        if len(o_nodes) > 0:
+        if o_nodes:
             data['Others'].x = o_x
             data['Others'].y = o_y
         
@@ -249,23 +272,45 @@ class ShiftDataset(Dataset):
             edge_index_dict[rel][1].append(dst_id)
             edge_attr_dict[rel].append(bond_feat)
         
-        # Integriere auch das "length"-Feature in die Kantenfeatures
         def get_bond_features(bond_data):
-            bt = bond_data.get('bond_type', 'SINGLE')
-            bt_val = 1.0 if bt == 'SINGLE' else 2.0 if bt == 'DOUBLE' else 3.0 if bt == 'TRIPLE' else 0.0
-            is_arom = 1.0 if bond_data.get('is_aromatic', False) else 0.0
-            bd = bond_data.get('bond_dir', 'NONE')
-            bd_val = 0.0 if bd == 'NONE' else 1.0 if bd == 'ENDUPRIGHT' else 0.5
-            bo = bond_data.get('bond_order', 1.0)
-            length = bond_data.get('length', 0.0)  # Neues Feature
-            return [bt_val, is_arom, bd_val, bo, length]
+            # Nominale Features werden per One-Hot kodiert.
+            # bond_type: SINGLE, DOUBLE, TRIPLE
+            bond_type = bond_data.get('bond_type', 'SINGLE')
+            if bond_type == 'SINGLE':
+                bond_type_onehot = [1, 0, 0]
+            elif bond_type == 'DOUBLE':
+                bond_type_onehot = [0, 1, 0]
+            elif bond_type == 'TRIPLE':
+                bond_type_onehot = [0, 0, 1]
+            else:
+                bond_type_onehot = [0, 0, 0]
+            
+            # bond_dir: NONE, ENDUPRIGHT, OTHER
+            bond_dir = bond_data.get('bond_dir', 'NONE')
+            if bond_dir == 'NONE':
+                bond_dir_onehot = [1, 0, 0]
+            elif bond_dir == 'ENDUPRIGHT':
+                bond_dir_onehot = [0, 1, 0]
+            else:
+                bond_dir_onehot = [0, 0, 1]
+            
+            # is_aromatic: binär → One-Hot
+            is_aromatic = bond_data.get('is_aromatic', False)
+            is_aromatic_onehot = [0, 1] if is_aromatic else [1, 0]
+            
+            # Ordinale Features: bond_order und length
+            bond_order = bond_data.get('bond_order', 1.0)
+            bond_order_val = (bond_order - self.edge_order_mean) / (self.edge_order_std + 1e-6)
+            
+            length = bond_data.get('length', 0.0)
+            length_val = (length - self.edge_length_mean) / (self.edge_length_std + 1e-6)
+            
+            return bond_type_onehot + bond_dir_onehot + is_aromatic_onehot + [bond_order_val, length_val]
         
-        # Extrahiere Kanten (bidirektional) und normalisiere das "length"-Feature
+        # Extrahiere Kanten (bidirektional)
         for u, v in nx_g.edges():
             bond_data = nx_g[u][v]
             bond_feat = get_bond_features(bond_data)
-            # Normalisierung: Subtrahiere Mittelwert und dividiere durch Std
-            bond_feat[-1] = (bond_feat[-1] - self.edge_length_mean) / (self.edge_length_std + 1e-6)
             u_element = nx_g.nodes[u]["element"]
             v_element = nx_g.nodes[v]["element"]
             if u_element == "H":
@@ -289,7 +334,6 @@ class ShiftDataset(Dataset):
             add_edge(u_type, v_type, u_idx, v_idx, bond_feat)
             add_edge(v_type, u_type, v_idx, u_idx, bond_feat)
         
-        # Konvertiere Kanteninformationen in Tensors
         for rel, (row, col) in edge_index_dict.items():
             data[rel].edge_index = torch.tensor([row, col], dtype=torch.long)
             edge_feats = torch.tensor(edge_attr_dict[rel], dtype=torch.float)
@@ -297,10 +341,13 @@ class ShiftDataset(Dataset):
         
         return data
 
-def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl", split_ratio=(0.8, 0.1, 0.1)):
-    dataset = ShiftDataset(root_dir=root_dir, file_name=file_name)
+def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl", split_ratio=(0.8, 0.1, 0.1),
+                       normalize_node_features=True, normalize_edge_features=True):
+    dataset = ShiftDataset(root_dir=root_dir, file_name=file_name,
+                           normalize_node_features=normalize_node_features,
+                           normalize_edge_features=normalize_edge_features)
     
-    # Gruppiere Graphen nach dem 'compound'-Attribut (in den Graph-Attributen)
+    # Gruppiere Graphen nach dem 'compound'-Attribut
     compound_to_indices = {}
     for idx, nx_g in enumerate(dataset.nx_graphs):
         compound = nx_g.graph.get("compound", None)

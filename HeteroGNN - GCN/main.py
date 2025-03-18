@@ -37,6 +37,8 @@ def main():
     config.scheduler_patience = 10
     config.loss_weight_H = 10
     config.loss_weight_C = 1
+    config.normalize_edge_features = False
+    config.normalize_node_features = True
 
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
@@ -53,7 +55,10 @@ def main():
     # 4) Dataloaders (mit split_ratio aus config)
     train_loader, val_loader, test_loader = create_dataloaders(
         batch_size=config.batch_size, 
-        split_ratio=config.split_ratio
+        split_ratio=config.split_ratio,
+        normalize_node_features=config.normalize_node_features,
+        normalize_edge_features=config.normalize_edge_features
+        
     )
     
     # 5) Modell erstellen
@@ -75,7 +80,7 @@ def main():
         num_gnn_layers=config.num_gnn_layers,
         operator_type=config.operator_type,
         operator_kwargs=config.operator_kwargs,
-        edge_in_dim=5
+        edge_in_dim=10
     ).to(device)
     
     # 6) Trainieren

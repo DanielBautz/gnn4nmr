@@ -28,11 +28,13 @@ def train_one_epoch(model, dataloader, device, optimizer, config):
             y_dict[ntype] = getattr(batch_data[ntype], 'y', None)
         
         edge_index_dict = {}
+        edge_attr_dict = {}
         for store in batch_data.edge_stores:
             src, rel, dst = store._key
             edge_index_dict[(src, rel, dst)] = store.edge_index
+            edge_attr_dict[(src, rel, dst)] = store.edge_attr
         
-        out_dict = model(x_dict, edge_index_dict)
+        out_dict = model(x_dict, edge_index_dict, edge_attr_dict)
         loss_terms = []
         
         # H
@@ -91,11 +93,13 @@ def evaluate_with_config(model, dataloader, device, config):
             y_dict[ntype] = getattr(batch_data[ntype], 'y', None)
         
         edge_index_dict = {}
+        edge_attr_dict = {}
         for store in batch_data.edge_stores:
             src, rel, dst = store._key
             edge_index_dict[(src, rel, dst)] = store.edge_index
+            edge_attr_dict[(src, rel, dst)] = store.edge_attr
         
-        out_dict = model(x_dict, edge_index_dict)
+        out_dict = model(x_dict, edge_index_dict, edge_attr_dict)
         
         # H
         if out_dict['H'] is not None and y_dict['H'] is not None:

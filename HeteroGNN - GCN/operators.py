@@ -1,4 +1,4 @@
-from torch_geometric.nn import GraphConv, GCNConv, GATConv, SAGEConv, GATv2Conv, GINEConv, NNConv
+from torch_geometric.nn import GraphConv, GCNConv, GATConv, SAGEConv, GATv2Conv, GINEConv, NNConv, TransformerConv 
 import torch.nn as nn
 
 OPERATOR_MAP = {
@@ -6,7 +6,8 @@ OPERATOR_MAP = {
     "GCNConv": GCNConv,
     "GATConv": GATConv,
     "SAGEConv": SAGEConv,
-    "GATv2Conv": GATv2Conv
+    "GATv2Conv": GATv2Conv,
+    "TransformerConv": TransformerConv
 }
 
 def get_conv_operator(operator_type: str):

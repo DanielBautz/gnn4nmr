@@ -5,6 +5,8 @@ import wandb
 from dataloader import create_dataloaders
 from model import HeteroGNNModel
 from train import train_model
+from explainer import explain_nodes
+
 
 def main():
     # 1) Weights & Biases init
@@ -37,12 +39,12 @@ def main():
     config.scheduler_patience = 10
     config.loss_weight_H = 10
     config.loss_weight_C = 1
-    config.normalize_edge_features = False
+    config.normalize_edge_features = False # wenn deaktiviert, Mittelwert = 0, Std = 1
     config.normalize_node_features = True
 
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
-        config.operator_type = "GINEConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv" 
+        config.operator_type = "GraphConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv", "TransformerConv" 
 
     # Optionale zusätzliche Parameter für den Operator
     if not hasattr(config, "operator_kwargs"):
@@ -95,6 +97,14 @@ def main():
     
     # 7) Beenden
     wandb.finish()
+
+    # Angenommen, test_loader liefert HeteroData-Batches:
+    test_batch = next(iter(test_loader))
+    # Wähle beispielsweise Knoten des Typs "H" aus dem Testbatch:
+    node_indices_to_explain = [0, 1, 2, 3]  # Passe die Indizes an deine Bedürfnisse an
+
+    # Erkläre die ausgewählten Knoten (z. B. mit 100 Epochen für den Explainer)
+    explanations = explain_nodes(trained_model, test_batch, "H", node_indices_to_explain, epochs=100)
 
 if __name__ == "__main__":
     main()

@@ -6,6 +6,7 @@ from dataloader import create_dataloaders
 from model import HeteroGNNModel
 from train import train_model
 from explainer import explain_nodes
+import os
 
 
 def main():
@@ -21,10 +22,10 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(config.seed)
     
-    # 3) Hyperparameter
-    config.batch_size = 4
-    config.hidden_dim = 32      # für den Encoder
-    config.out_dim = 64         # für Encoder-Output und GNN
+    # 3) Hyperparameter - Zurück zu ursprünglichen Werten für bessere Genauigkeit
+    config.batch_size = 4  # Original batch size for better accuracy
+    config.hidden_dim = 32  # für den Encoder
+    config.out_dim = 64     # für Encoder-Output und GNN
     config.num_epochs = 100
     config.lr = 5e-4
 
@@ -33,35 +34,55 @@ def main():
     config.encoder_dropout = 0.1
     config.gnnlayer_dropout = 0.1
     config.num_gnn_layers = 2
-    config.optimizer = "Adam"   # Optionen: "Adam", "SGD", etc.
+    config.optimizer = "Adam"  # Optionen: "Adam", "SGD", etc.
     config.weight_decay = 0.0
     config.scheduler_factor = 0.5
     config.scheduler_patience = 10
     config.loss_weight_H = 10
     config.loss_weight_C = 1
-    config.normalize_edge_features = False # wenn deaktiviert, Mittelwert = 0, Std = 1
+    config.normalize_edge_features = False  # wenn deaktiviert, Mittelwert = 0, Std = 1
     config.normalize_node_features = True
 
+    # Performance-Optimierungen mit angepassten Werten für bessere Genauigkeit
+    config.use_mixed_precision = False  # Deaktiviere Mixed Precision für bessere Genauigkeit
+    config.gradient_accumulation_steps = 1  # Deaktiviere Gradient Accumulation
+    
+    # DataLoader-Optimierungen
+    num_cpu_cores = os.cpu_count() or 1
+    # Reduziere Anzahl der Worker für stabileres Training
+    config.num_workers = min(2, num_cpu_cores)
+    config.pin_memory = True
+    # Persistent workers nur aktivieren wenn worker > 0
+    config.persistent_workers = config.num_workers > 0
+    
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
-        config.operator_type = "GraphConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv", "TransformerConv" 
+        config.operator_type = "GINEConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv", "TransformerConv" 
 
     # Optionale zusätzliche Parameter für den Operator
     if not hasattr(config, "operator_kwargs"):
         config.operator_kwargs = {}
     if config.operator_type == "GATConv" or config.operator_type == "GATv2Conv":
-        config.operator_kwargs['add_self_loops'] = False    
+        config.operator_kwargs['add_self_loops'] = False
+    
+    # Aktiviere cuDNN Benchmarking für optimale Performance, wenn nicht im Debug-Modus
+    torch.backends.cudnn.benchmark = True
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # 4) Dataloaders (mit split_ratio aus config)
+    # 4) Dataloaders (mit optimierten Parametern)
     train_loader, val_loader, test_loader = create_dataloaders(
         batch_size=config.batch_size, 
         split_ratio=config.split_ratio,
         normalize_node_features=config.normalize_node_features,
-        normalize_edge_features=config.normalize_edge_features
-        
+        normalize_edge_features=config.normalize_edge_features,
+        num_workers=config.num_workers,
+        pin_memory=config.pin_memory,
+        persistent_workers=config.persistent_workers
     )
+    
+    # Speichernutzung optimieren
+    torch.cuda.empty_cache()
     
     # 5) Modell erstellen
     example_data = next(iter(train_loader))
@@ -82,7 +103,8 @@ def main():
         num_gnn_layers=config.num_gnn_layers,
         operator_type=config.operator_type,
         operator_kwargs=config.operator_kwargs,
-        edge_in_dim=10
+        edge_in_dim=10,
+        use_activation_checkpointing=False  # Deaktiviere für bessere Genauigkeit
     ).to(device)
     
     # 6) Trainieren
@@ -97,14 +119,9 @@ def main():
     
     # 7) Beenden
     wandb.finish()
-
-    # Angenommen, test_loader liefert HeteroData-Batches:
-    test_batch = next(iter(test_loader))
-    # Wähle beispielsweise Knoten des Typs "H" aus dem Testbatch:
-    node_indices_to_explain = [0, 1, 2, 3]  # Passe die Indizes an deine Bedürfnisse an
-
-    # Erkläre die ausgewählten Knoten (z. B. mit 100 Epochen für den Explainer)
-    explanations = explain_nodes(trained_model, test_batch, "H", node_indices_to_explain, epochs=100)
+    
+    # Clean up
+    torch.cuda.empty_cache()
 
 if __name__ == "__main__":
     main()

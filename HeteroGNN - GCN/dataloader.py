@@ -342,7 +342,8 @@ class ShiftDataset(Dataset):
         return data
 
 def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl", split_ratio=(0.8, 0.1, 0.1),
-                       normalize_node_features=True, normalize_edge_features=True):
+                       normalize_node_features=True, normalize_edge_features=True, 
+                       num_workers=4, pin_memory=True, persistent_workers=True):
     dataset = ShiftDataset(root_dir=root_dir, file_name=file_name,
                            normalize_node_features=normalize_node_features,
                            normalize_edge_features=normalize_edge_features)
@@ -388,8 +389,32 @@ def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl"
     val_dataset = torch.utils.data.Subset(dataset, val_indices)
     test_dataset = torch.utils.data.Subset(dataset, test_indices)
     
-    train_loader = PyGDataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader   = PyGDataLoader(val_dataset,   batch_size=batch_size, shuffle=False)
-    test_loader  = PyGDataLoader(test_dataset,  batch_size=batch_size, shuffle=False)
+    # Optimized DataLoader configuration
+    train_loader = PyGDataLoader(
+        train_dataset, 
+        batch_size=batch_size, 
+        shuffle=True, 
+        num_workers=num_workers, 
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers if num_workers > 0 else False
+    )
+    
+    val_loader = PyGDataLoader(
+        val_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers=num_workers, 
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers if num_workers > 0 else False
+    )
+    
+    test_loader = PyGDataLoader(
+        test_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers=num_workers, 
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers if num_workers > 0 else False
+    )
     
     return train_loader, val_loader, test_loader

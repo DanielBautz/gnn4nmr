@@ -1,5 +1,5 @@
 import torch
-from torch_geometric.nn import GNNExplainer
+from torch_geometric.explain import GNNExplainer
 import matplotlib.pyplot as plt
 
 def explain_node(model, data, node_type, node_idx, epochs=200):

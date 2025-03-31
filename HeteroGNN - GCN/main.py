@@ -57,7 +57,7 @@ def main():
     
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
-        config.operator_type = "GINEConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv", "TransformerConv" 
+        config.operator_type = "GraphConv"  # Alternativen: "GCNConv", "GATConv", "SAGEConv", "GATv2Conv", "GraphConv", "NNConv", "GINEConv", "TransformerConv" 
 
     # Optionale zusätzliche Parameter für den Operator
     if not hasattr(config, "operator_kwargs"):
@@ -85,6 +85,7 @@ def main():
     torch.cuda.empty_cache()
     
     # 5) Modell erstellen
+    
     example_data = next(iter(train_loader))
     in_dim_dict = {}
     for ntype in example_data.node_types:
@@ -92,7 +93,13 @@ def main():
             in_dim_dict[ntype] = example_data[ntype].x.size(-1)
             print(f"Node type {ntype} has input dimension {in_dim_dict[ntype]}")
         else:
-            in_dim_dict[ntype] = 0
+            in_dim_dict = {
+            "H": 41,
+            "C": 48,
+            "Others": 17
+            }     
+
+       
     
     model = HeteroGNNModel(
         in_dim_dict, 

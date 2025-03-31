@@ -6,6 +6,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from torch_geometric.data import HeteroData
 from torch_geometric.loader import DataLoader as PyGDataLoader
+from sklearn.model_selection import KFold
 
 # Liste aller möglichen Elemente für One-Hot-Encoding
 ALL_ELEMENTS = [
@@ -341,55 +342,138 @@ class ShiftDataset(Dataset):
         
         return data
 
-def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl", split_ratio=(0.8, 0.1, 0.1),
-                       normalize_node_features=True, normalize_edge_features=True):
-    dataset = ShiftDataset(root_dir=root_dir, file_name=file_name,
-                           normalize_node_features=normalize_node_features,
-                           normalize_edge_features=normalize_edge_features)
-    
-    # Gruppiere Graphen nach dem 'compound'-Attribut
+
+def get_compound_indices(dataset):
+    """
+    Gruppiere Graphen nach dem 'compound'-Attribut und gibt zurück:
+    - Ein Dictionary das compound-Name zu Graph-Indices mappt
+    - Eine Liste aller Compounds
+    """
     compound_to_indices = {}
     for idx, nx_g in enumerate(dataset.nx_graphs):
         compound = nx_g.graph.get("compound", None)
         if compound is None:
-            compound = "unknown"
+            compound = f"unknown_{idx}"  # Eindeutige ID für unbekannte Compounds
         if compound not in compound_to_indices:
             compound_to_indices[compound] = []
         compound_to_indices[compound].append(idx)
     
     compounds = list(compound_to_indices.keys())
+    return compound_to_indices, compounds
+
+
+def create_kfold_dataloaders(batch_size=4, n_folds=5, fold_idx=0, root_dir="data", file_name="all_graphs.pkl",
+                            split_ratio=(0.8, 0.1, 0.1), normalize_node_features=True, normalize_edge_features=True):
+    """
+    Erstellt Dataloaders für k-fold Cross-Validation.
+    
+    Args:
+        batch_size: Batch-Size für die Dataloaders
+        n_folds: Anzahl der Folds für Cross-Validation
+        fold_idx: Index des aktuellen Folds (0 bis n_folds-1)
+        root_dir, file_name: Pfad zum Pickle-File mit den Graphen
+        split_ratio: Nur verwendet wenn n_folds = 1, dann wie vorher (Train, Val, Test) Split
+        normalize_node_features, normalize_edge_features: Ob Features normalisiert werden sollen
+        
+    Returns:
+        train_loader, val_loader, test_loader: Die entsprechenden DataLoader-Objekte
+    """
+    dataset = ShiftDataset(
+        root_dir=root_dir, 
+        file_name=file_name,
+        normalize_node_features=normalize_node_features,
+        normalize_edge_features=normalize_edge_features
+    )
+    
+    # Gruppiere nach Compound
+    compound_to_indices, compounds = get_compound_indices(dataset)
+    
+    # Shuffle der Compounds mit fester Seed für Reproduzierbarkeit
     random.shuffle(compounds)
     
-    num_compounds = len(compounds)
-    train_end = int(split_ratio[0] * num_compounds)
-    val_end = train_end + int(split_ratio[1] * num_compounds)
+    # Fall 1: n_folds=1, dann normaler Train/Val/Test split wie vorher
+    if n_folds == 1:
+        num_compounds = len(compounds)
+        train_end = int(split_ratio[0] * num_compounds)
+        val_end = train_end + int(split_ratio[1] * num_compounds)
+        
+        train_compounds = compounds[:train_end]
+        val_compounds = compounds[train_end:val_end]
+        test_compounds = compounds[val_end:]
+        
+        train_indices = []
+        for comp in train_compounds:
+            train_indices.extend(compound_to_indices[comp])
+        
+        val_indices = []
+        for comp in val_compounds:
+            val_indices.extend(compound_to_indices[comp])
+        
+        test_indices = []
+        for comp in test_compounds:
+            test_indices.extend(compound_to_indices[comp])
     
-    train_compounds = compounds[:train_end]
-    val_compounds = compounds[train_end:val_end]
-    test_compounds = compounds[val_end:]
+    # Fall 2: k-fold Cross-Validation
+    else:
+        # Verwende KFold aus sklearn für die Partitionierung
+        kf = KFold(n_splits=n_folds, shuffle=False)  # Shuffle ist bereits bei compounds passiert
+        
+        # Konvertiere compounds zu einer Liste, die iteriert werden kann
+        compounds_list = list(compounds)
+        
+        # Erzeuge die Partitionen
+        splits = list(kf.split(compounds_list))
+        train_val_idx, test_idx = splits[fold_idx]
+        
+        # Wir teilen train_val nochmal auf in train und val (80/20)
+        train_val_compounds = [compounds_list[i] for i in train_val_idx]
+        n_train = int(0.8 * len(train_val_compounds))
+        train_compounds = train_val_compounds[:n_train]
+        val_compounds = train_val_compounds[n_train:]
+        test_compounds = [compounds_list[i] for i in test_idx]
+        
+        # Konkateniere die Indices der entsprechenden Compounds
+        train_indices = []
+        for comp in train_compounds:
+            train_indices.extend(compound_to_indices[comp])
+        
+        val_indices = []
+        for comp in val_compounds:
+            val_indices.extend(compound_to_indices[comp])
+        
+        test_indices = []
+        for comp in test_compounds:
+            test_indices.extend(compound_to_indices[comp])
     
-    train_indices = []
-    for comp in train_compounds:
-        train_indices.extend(compound_to_indices[comp])
-    
-    val_indices = []
-    for comp in val_compounds:
-        val_indices.extend(compound_to_indices[comp])
-    
-    test_indices = []
-    for comp in test_compounds:
-        test_indices.extend(compound_to_indices[comp])
-    
+    # Shuffle der Indices innerhalb jedes Splits
     random.shuffle(train_indices)
     random.shuffle(val_indices)
     random.shuffle(test_indices)
     
+    # Erstelle die entsprechenden Subsets
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
     val_dataset = torch.utils.data.Subset(dataset, val_indices)
     test_dataset = torch.utils.data.Subset(dataset, test_indices)
     
+    # Erstelle die DataLoader
     train_loader = PyGDataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader   = PyGDataLoader(val_dataset,   batch_size=batch_size, shuffle=False)
-    test_loader  = PyGDataLoader(test_dataset,  batch_size=batch_size, shuffle=False)
+    val_loader = PyGDataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = PyGDataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
     return train_loader, val_loader, test_loader
+
+
+# Behalte die alte Funktion für Rückwärtskompatibilität
+def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs.pkl", split_ratio=(0.8, 0.1, 0.1),
+                       normalize_node_features=True, normalize_edge_features=True):
+    """Legacy-Funktion für Rückwärtskompatibilität"""
+    return create_kfold_dataloaders(
+        batch_size=batch_size,
+        n_folds=1,
+        fold_idx=0,
+        root_dir=root_dir,
+        file_name=file_name,
+        split_ratio=split_ratio,
+        normalize_node_features=normalize_node_features,
+        normalize_edge_features=normalize_edge_features
+    )

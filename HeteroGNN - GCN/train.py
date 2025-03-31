@@ -131,11 +131,22 @@ def evaluate_with_config(model, dataloader, device, config):
     val_score = (val_mae_H * config.loss_weight_H + val_mae_C * config.loss_weight_C) / 2.0
     return val_mse_H, val_mae_H, val_mse_C, val_mae_C, val_score
 
-def train_model(model, train_loader, val_loader, test_loader, device, config):
+def train_model(model, train_loader, val_loader, test_loader, device, config, model_path="best_model.pt", fold_idx=None):
     """
     Haupttrainingsschleife:
       - Single-Model, multi-task (H und C).
       - Loggt train/val/test MSE und MAE für beide Targets.
+      
+    Args:
+        model: Das zu trainierende Modell
+        train_loader, val_loader, test_loader: Die entsprechenden DataLoader
+        device: Das Device (cuda/cpu) auf dem trainiert wird
+        config: Die Konfiguration mit Hyperparametern
+        model_path: Speicherpfad für das beste Modell (Standardwert: "best_model.pt")
+        fold_idx: Der aktuelle Fold-Index (nur bei k-fold Cross-Validation, sonst None)
+        
+    Returns:
+        Ein Dictionary mit dem trainierten Modell und den Test-Metriken
     """
     if config.optimizer == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
@@ -160,21 +171,25 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         
         scheduler.step(val_score)
         
+        # Prefix für Logging-Keys bei k-fold
+        prefix = f"fold_{fold_idx}_" if fold_idx is not None else ""
+        
         wandb.log({
-            "epoch": epoch,
-            "train_mse_C": train_mse_C,
-            "train_mae_C": train_mae_C,
-            "train_mse_H": train_mse_H,
-            "train_mae_H": train_mae_H,
-            "val_mse_C": val_mse_C,
-            "val_mae_C": val_mae_C,
-            "val_mse_H": val_mse_H,
-            "val_mae_H": val_mae_H,
-            "val_score": val_score,
-            "lr": optimizer.param_groups[0]["lr"]
+            f"{prefix}epoch": epoch,
+            f"{prefix}train_mse_C": train_mse_C,
+            f"{prefix}train_mae_C": train_mae_C,
+            f"{prefix}train_mse_H": train_mse_H,
+            f"{prefix}train_mae_H": train_mae_H,
+            f"{prefix}val_mse_C": val_mse_C,
+            f"{prefix}val_mae_C": val_mae_C,
+            f"{prefix}val_mse_H": val_mse_H,
+            f"{prefix}val_mae_H": val_mae_H,
+            f"{prefix}val_score": val_score,
+            f"{prefix}lr": optimizer.param_groups[0]["lr"]
         })
         
-        print(f"Epoch [{epoch+1}/{config.num_epochs}]")
+        fold_info = f"Fold {fold_idx+1} - " if fold_idx is not None else ""
+        print(f"{fold_info}Epoch [{epoch+1}/{config.num_epochs}]")
         print(f"  Train   => H: MSE={train_mse_H:.4f}, MAE={train_mae_H:.4f} |"
               f"  C: MSE={train_mse_C:.4f}, MAE={train_mae_C:.4f}")
         print(f"  Val     => H: MSE={val_mse_H:.4f}, MAE={val_mae_H:.4f} |"
@@ -182,19 +197,27 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         
         if val_score < best_val_score:
             best_val_score = val_score
-            torch.save(model.state_dict(), "best_model.pt")
+            torch.save(model.state_dict(), model_path)
     
-    model.load_state_dict(torch.load("best_model.pt"))
-    test_mse_H, test_mae_H, test_mse_C, test_mae_C, _ = evaluate_with_config(model, test_loader, device, config)
+    model.load_state_dict(torch.load(model_path))
+    test_mse_H, test_mae_H, test_mse_C, test_mae_C, test_score = evaluate_with_config(model, test_loader, device, config)
+    
+    # Prefix für Logging-Keys bei k-fold
+    prefix = f"fold_{fold_idx}_" if fold_idx is not None else ""
     
     wandb.log({
-        "test_mse_C": test_mse_C,
-        "test_mae_C": test_mae_C,
-        "test_mse_H": test_mse_H,
-        "test_mae_H": test_mae_H
+        f"{prefix}test_mse_C": test_mse_C,
+        f"{prefix}test_mae_C": test_mae_C,
+        f"{prefix}test_mse_H": test_mse_H,
+        f"{prefix}test_mae_H": test_mae_H
     })
     
-    print(f"** Test ** => H: MSE={test_mse_H:.4f}, MAE={test_mae_H:.4f} |"
+    fold_info = f"Fold {fold_idx+1} - " if fold_idx is not None else ""
+    print(f"{fold_info}** Test ** => H: MSE={test_mse_H:.4f}, MAE={test_mae_H:.4f} |"
           f"  C: MSE={test_mse_C:.4f}, MAE={test_mae_C:.4f}")
     
-    return model
+    # Gib ein Ergebnisdictionary zurück, das sowohl das Modell als auch die Test-Metriken enthält
+    return {
+        "model": model,
+        "test_metrics": (test_mse_H, test_mae_H, test_mse_C, test_mae_C, test_score)
+    }

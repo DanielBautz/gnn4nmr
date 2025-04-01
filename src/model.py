@@ -9,10 +9,10 @@ class MLPEncoder(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(in_channels, hidden_channels),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),  # inplace=True für Speichereffizienz
             nn.Dropout(p=dropout_prob),
             nn.Linear(hidden_channels, out_channels),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),  # inplace=True für Speichereffizienz
             nn.Dropout(p=dropout_prob)
         )
     
@@ -87,6 +87,9 @@ class HeteroGNNModel(nn.Module):
         # Erstelle num_gnn_layers HeteroConv-Schichten
         self.convs = nn.ModuleList([HeteroConv(create_conv_layers(), aggr='sum') for _ in range(num_gnn_layers)])
         
+        # ReLU-Aktivierungen mit inplace=True für Speichereffizienz
+        self.relu = nn.ReLU(inplace=True)
+        
         # Zwei separate Vorhersageköpfe für Shift-Werte (für H und C)
         self.pred_heads = nn.ModuleDict({
             'H': nn.Linear(out_dim, 1), 
@@ -110,8 +113,9 @@ class HeteroGNNModel(nn.Module):
         # (2) Wende die HeteroConv-Schichten an.
         for conv in self.convs:
             x_dict = conv(x_dict, edge_index_dict, **conv_kwargs)
+            # Anwenden von ReLU und Dropout direkt auf x_dict
             for ntype in x_dict:
-                x_dict[ntype] = self.gnn_dropout(nn.ReLU()(x_dict[ntype]))
+                x_dict[ntype] = self.gnn_dropout(self.relu(x_dict[ntype]))
         
         # (3) Erzeuge die Vorhersagen für H und C.
         out_dict = {}

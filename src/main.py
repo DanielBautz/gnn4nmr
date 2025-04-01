@@ -2,13 +2,14 @@ import random
 import numpy as np
 import torch
 import wandb
+import os
 from dataloader import create_kfold_dataloaders
 from model import HeteroGNNModel
 from train import train_model
 
 def main():
     # 1) Weights & Biases init
-    wandb.init(project="gnn_shift_prediction")
+    wandb.init(project="gnn_shift_prediction_sweep")
     config = wandb.config
     
     # 2) Globalen Seed definieren
@@ -20,7 +21,7 @@ def main():
         torch.cuda.manual_seed_all(config.seed)
     
     # 3) Hyperparameter
-    config.batch_size = 4
+    config.batch_size = 16  # Erhöht für bessere GPU-Auslastung
     config.hidden_dim = 32      # für den Encoder
     config.out_dim = 64         # für Encoder-Output und GNN
     config.num_epochs = 100
@@ -39,10 +40,17 @@ def main():
     config.loss_weight_C = 1
     config.normalize_edge_features = False
     config.normalize_node_features = True
+    
+    # Performance-Optimierungen
+    config.benchmark = True                    # Für bessere CUDA-Leistung mit fester Graph-Struktur
+    config.use_amp = True                      # Automatic Mixed Precision
+    config.num_workers = min(4, os.cpu_count() or 1) # Parallelisierung des Dataloaders
+    config.pin_memory = True                   # Pinned Memory für schnellere CPU->GPU Transfer
+    config.persistent_workers = True           # Worker zwischen Iterationen beibehalten
 
     # Parameter für k-fold Cross-Validation
     if not hasattr(config, "k_folds"):
-        config.k_folds = 5  # Standard: kein k-fold
+        config.k_folds = 3  # Standard: kein k-fold
     
     # Neuer Parameter: Operator-Typ für das GNN 
     if not hasattr(config, "operator_type"):
@@ -55,6 +63,19 @@ def main():
         config.operator_kwargs['add_self_loops'] = False    
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # CUDA-spezifische Optimierungen
+    if device.type == 'cuda':
+        # Benchmark-Modus für bessere Geschwindigkeit bei wiederholten Netzwerkgrößen
+        torch.backends.cudnn.benchmark = config.benchmark
+        # Speichere Tensor-Kern für die aktuelle Tensorform
+        torch.backends.cudnn.deterministic = False
+        
+        # Ausgabe von CUDA-Informationen
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"Memory Allocated: {torch.cuda.memory_allocated(0) / 1e9:.2f} GB")
+        print(f"Memory Reserved: {torch.cuda.memory_reserved(0) / 1e9:.2f} GB")
 
     # K-Fold Cross Validation
     if config.k_folds > 1:
@@ -67,14 +88,17 @@ def main():
         for fold_idx in range(config.k_folds):
             print(f"\n====== FOLD {fold_idx+1}/{config.k_folds} ======")
             
-            # Erstelle Dataloaders für aktuellen Fold
+            # Erstelle Dataloaders für aktuellen Fold mit optimierten Parametern
             train_loader, val_loader, test_loader = create_kfold_dataloaders(
                 batch_size=config.batch_size,
                 n_folds=config.k_folds,
                 fold_idx=fold_idx,
                 split_ratio=config.split_ratio,
                 normalize_node_features=config.normalize_node_features,
-                normalize_edge_features=config.normalize_edge_features
+                normalize_edge_features=config.normalize_edge_features,
+                num_workers=config.num_workers,
+                pin_memory=config.pin_memory,
+                persistent_workers=config.persistent_workers
             )
             
             # Modell für diesen Fold erstellen
@@ -128,6 +152,10 @@ def main():
                 f"fold_{fold_idx}_test_mse_C": test_mse_C,
                 f"fold_{fold_idx}_test_mae_C": test_mae_C
             })
+            
+            # Leere CUDA-Cache zwischen Folds
+            if device.type == 'cuda':
+                torch.cuda.empty_cache()
         
         # Berechne und logge Durchschnitt und Standardabweichung über alle Folds
         avg_metrics = {}
@@ -148,14 +176,17 @@ def main():
         
     else:
         # Standard-Training ohne k-fold (wie vorher)
-        # 4) Dataloaders (mit split_ratio aus config)
+        # 4) Dataloaders (mit split_ratio aus config und optimierten Parametern)
         train_loader, val_loader, test_loader = create_kfold_dataloaders(
             batch_size=config.batch_size, 
             n_folds=1,
             fold_idx=0,
             split_ratio=config.split_ratio,
             normalize_node_features=config.normalize_node_features,
-            normalize_edge_features=config.normalize_edge_features
+            normalize_edge_features=config.normalize_edge_features,
+            num_workers=config.num_workers,
+            pin_memory=config.pin_memory,
+            persistent_workers=config.persistent_workers
         )
         
         # 5) Modell erstellen

@@ -363,9 +363,10 @@ def get_compound_indices(dataset):
 
 
 def create_kfold_dataloaders(batch_size=4, n_folds=5, fold_idx=0, root_dir="data", file_name="all_graphs.pkl",
-                            split_ratio=(0.8, 0.1, 0.1), normalize_node_features=True, normalize_edge_features=True):
+                            split_ratio=(0.8, 0.1, 0.1), normalize_node_features=True, normalize_edge_features=True,
+                            num_workers=0, pin_memory=False, persistent_workers=False):
     """
-    Erstellt Dataloaders für k-fold Cross-Validation.
+    Erstellt Dataloaders für k-fold Cross-Validation mit Performance-Optimierungen.
     
     Args:
         batch_size: Batch-Size für die Dataloaders
@@ -374,10 +375,14 @@ def create_kfold_dataloaders(batch_size=4, n_folds=5, fold_idx=0, root_dir="data
         root_dir, file_name: Pfad zum Pickle-File mit den Graphen
         split_ratio: Nur verwendet wenn n_folds = 1, dann wie vorher (Train, Val, Test) Split
         normalize_node_features, normalize_edge_features: Ob Features normalisiert werden sollen
+        num_workers: Anzahl der Worker-Prozesse für den DataLoader
+        pin_memory: Ob Pinned Memory für schnelleren Transfer zur GPU verwendet werden soll
+        persistent_workers: Behält Worker zwischen Dateniterationen (gut für wiederholte Epochen)
         
     Returns:
         train_loader, val_loader, test_loader: Die entsprechenden DataLoader-Objekte
     """
+    # ShiftDataset ist bereits in der Datei definiert, daher kein Import nötig
     dataset = ShiftDataset(
         root_dir=root_dir, 
         file_name=file_name,
@@ -455,10 +460,31 @@ def create_kfold_dataloaders(batch_size=4, n_folds=5, fold_idx=0, root_dir="data
     val_dataset = torch.utils.data.Subset(dataset, val_indices)
     test_dataset = torch.utils.data.Subset(dataset, test_indices)
     
-    # Erstelle die DataLoader
-    train_loader = PyGDataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = PyGDataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = PyGDataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    # Erstelle die DataLoader mit verbesserten Performance-Optionen
+    train_loader = PyGDataLoader(
+        train_dataset, 
+        batch_size=batch_size, 
+        shuffle=True, 
+        num_workers=num_workers, 
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers if num_workers > 0 else False
+    )
+    val_loader = PyGDataLoader(
+        val_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers=num_workers, 
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers if num_workers > 0 else False
+    )
+    test_loader = PyGDataLoader(
+        test_dataset, 
+        batch_size=batch_size, 
+        shuffle=False, 
+        num_workers=num_workers, 
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers if num_workers > 0 else False
+    )
     
     return train_loader, val_loader, test_loader
 

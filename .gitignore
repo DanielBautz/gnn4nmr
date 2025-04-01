@@ -2,6 +2,7 @@
 wandb/
 old code/
 __pycache__/
+model/
 
 #files
 __init__.py 

@@ -75,8 +75,10 @@
         <!-- Darstellung der Radiowellen als Wellenlinie -->
         <mxCell id="radiowave" value="" style="edgeStyle=elbowEdgeStyle;dashed=1;strokeColor=#fcba00;endArrow=block;html=1;" edge="1" parent="panel3Group">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="300" y="130"/>
-            <mxPoint x="130" y="130"/>
+            <Array as="points">
+              <mxPoint x="300" y="130"/>
+              <mxPoint x="130" y="130"/>
+            </Array>
           </mxGeometry>
         </mxCell>
         

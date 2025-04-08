@@ -1,52 +1,134 @@
-<mxfile host="app.diagrams.net">
-  <diagram id="NMR_spektroskopie" name="NMR Spektroskopie Erklärung">
-    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1">
+<mxfile host="app.diagrams.net" modified="2025-04-08T12:00:00.000Z" agent="ChatGPT" etag="nmr2025" version="14.6.13" type="device">
+  <diagram id="nmrDiagram" name="So funktioniert NMR-Spektroskopie – Magnetfelder sichtbar machen">
+    <mxGraphModel dx="1353" dy="788" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100">
       <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-
-        <!-- Panel 1: Atomkerne ohne Magnetfeld -->
-        <mxCell id="panel1" value="1. Ohne Magnetfeld" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004e9f;fontColor=#FFFFFF;fontSize=16" vertex="1" parent="1">
-          <mxGeometry x="20" y="20" width="260" height="160" as="geometry" />
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- Panel 1: Die Ausgangssituation -->
+        <mxCell id="panel1Group" value="" style="group" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="400" height="220" as="geometry"/>
         </mxCell>
-        <mxCell id="kern1" value="Atomkerne (zufällige Spins)" style="ellipse;fillColor=#909085;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="60" y="70" width="180" height="60" as="geometry" />
+        <mxCell id="panel1Header" value="Panel 1: Die Ausgangssituation&#xa;Was passiert im Atomkern?" style="rounded=1;fillColor=#004e9f;strokeColor=none;fontColor=#ffffff;whiteSpace=wrap;html=1;" vertex="1" parent="panel1Group">
+          <mxGeometry x="10" y="10" width="380" height="30" as="geometry"/>
         </mxCell>
-
-        <!-- Panel 2: Atomkerne mit Magnetfeld -->
-        <mxCell id="panel2" value="2. Anlegen Magnetfeld" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004e9f;fontColor=#FFFFFF;fontSize=16" vertex="1" parent="1">
-          <mxGeometry x="320" y="20" width="260" height="160" as="geometry" />
+        <mxCell id="panel1Text" value="Atomkerne wie Wasserstoffkerne (Protonen) besitzen einen Eigendrehimpuls, den sogenannten Kernspin. Ohne ein äußeres Magnetfeld sind diese Spins zufällig verteilt." style="text;whiteSpace=wrap;html=1;" vertex="1" parent="panel1Group">
+          <mxGeometry x="10" y="50" width="380" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="kern2" value="Spins richten sich aus" style="ellipse;fillColor=#909085;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="360" y="70" width="180" height="60" as="geometry" />
+        <!-- Darstellung einiger Atomkerne mit Spin-Pfeilen -->
+        <mxCell id="atom1" value="↺" style="ellipse;fillColor=#fcba00;strokeColor=#004e9f;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel1Group">
+          <mxGeometry x="50" y="100" width="30" height="30" as="geometry"/>
         </mxCell>
-
-        <!-- Panel 3: Radiowellen -->
-        <mxCell id="panel3" value="3. Radiowellen-Anregung" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004e9f;fontColor=#FFFFFF;fontSize=16" vertex="1" parent="1">
-          <mxGeometry x="620" y="20" width="260" height="160" as="geometry" />
+        <mxCell id="atom2" value="↺" style="ellipse;fillColor=#fcba00;strokeColor=#004e9f;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel1Group">
+          <mxGeometry x="150" y="120" width="30" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="radio" value="Radiowellen" style="ellipse;fillColor=#fcba00;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="660" y="70" width="180" height="60" as="geometry" />
+        <mxCell id="atom3" value="↺" style="ellipse;fillColor=#fcba00;strokeColor=#004e9f;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel1Group">
+          <mxGeometry x="250" y="100" width="30" height="30" as="geometry"/>
         </mxCell>
-
-        <!-- Panel 4: Signal und Spektrum -->
-        <mxCell id="panel4" value="4. Signalaufnahme &amp; Spektrum" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004e9f;fontColor=#FFFFFF;fontSize=16" vertex="1" parent="1">
-          <mxGeometry x="920" y="20" width="260" height="160" as="geometry" />
+        
+        <!-- Panel 2: Anlegen eines starken Magnetfeldes -->
+        <mxCell id="panel2Group" value="" style="group" vertex="1" parent="1">
+          <mxGeometry x="20" y="260" width="400" height="220" as="geometry"/>
         </mxCell>
-        <mxCell id="signal" value="NMR-Signal &amp; Spektrum" style="ellipse;fillColor=#909085;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="960" y="70" width="180" height="60" as="geometry" />
+        <mxCell id="panel2Header" value="Panel 2: Anlegen eines starken Magnetfeldes" style="rounded=1;fillColor=#004e9f;strokeColor=none;fontColor=#ffffff;whiteSpace=wrap;html=1;" vertex="1" parent="panel2Group">
+          <mxGeometry x="10" y="10" width="380" height="30" as="geometry"/>
         </mxCell>
-
-        <!-- Pfeile zwischen Panels -->
-        <mxCell id="pfeil1" style="endArrow=block;strokeColor=#000000" edge="1" parent="1" source="kern1" target="kern2">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="panel2Text" value="Legt man ein starkes Magnetfeld an, richten sich die Spins entlang dieses Feldes aus. Dabei entstehen zwei Zustände: parallel (energetisch günstiger) und antiparallel (energetisch höher)." style="text;whiteSpace=wrap;html=1;" vertex="1" parent="panel2Group">
+          <mxGeometry x="10" y="50" width="380" height="40" as="geometry"/>
         </mxCell>
-        <mxCell id="pfeil2" style="endArrow=block;strokeColor=#000000" edge="1" parent="1" source="kern2" target="radio">
-          <mxGeometry relative="1" as="geometry" />
+        <!-- Darstellung eines Magneten -->
+        <mxCell id="magnet" value="Magnetfeld" style="rounded=1;fillColor=#909085;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="panel2Group">
+          <mxGeometry x="280" y="100" width="80" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="pfeil3" style="endArrow=block;strokeColor=#000000" edge="1" parent="1" source="radio" target="signal">
-          <mxGeometry relative="1" as="geometry" />
+        <!-- Spins in Panel 2: Parallel (blau) und Antiparallel (rot) -->
+        <mxCell id="spinParallel1" value="↺" style="ellipse;fillColor=#004e9f;strokeColor=#004e9f;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel2Group">
+          <mxGeometry x="50" y="120" width="30" height="30" as="geometry"/>
         </mxCell>
+        <mxCell id="spinParallel2" value="↺" style="ellipse;fillColor=#004e9f;strokeColor=#004e9f;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel2Group">
+          <mxGeometry x="120" y="120" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="spinAntiparallel" value="↻" style="ellipse;fillColor=red;strokeColor=red;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel2Group">
+          <mxGeometry x="190" y="120" width="30" height="30" as="geometry"/>
+        </mxCell>
+        
+        <!-- Panel 3: Anregung durch Radiowellen -->
+        <mxCell id="panel3Group" value="" style="group" vertex="1" parent="1">
+          <mxGeometry x="20" y="500" width="400" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="panel3Header" value="Panel 3: Anregung durch Radiowellen" style="rounded=1;fillColor=#004e9f;strokeColor=none;fontColor=#ffffff;whiteSpace=wrap;html=1;" vertex="1" parent="panel3Group">
+          <mxGeometry x="10" y="10" width="380" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="panel3Text" value="Radiowellen exakt passender Frequenz bringen die Kernspins in Resonanz. Dadurch wechseln einige Spins vom unteren Energieniveau ins höhere. Es entsteht ein charakteristisches Resonanzsignal." style="text;whiteSpace=wrap;html=1;" vertex="1" parent="panel3Group">
+          <mxGeometry x="10" y="50" width="380" height="40" as="geometry"/>
+        </mxCell>
+        <!-- Sender als Radiowellenquelle -->
+        <mxCell id="sender" value="Sender" style="shape=triangle;direction=west;fillColor=#fcba00;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="panel3Group">
+          <mxGeometry x="300" y="110" width="40" height="40" as="geometry"/>
+        </mxCell>
+        <!-- Spins in Panel 3 vor und nach der Anregung -->
+        <mxCell id="spinBefore" value="↺" style="ellipse;fillColor=#004e9f;strokeColor=#004e9f;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel3Group">
+          <mxGeometry x="50" y="120" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="spinAfter" value="↻" style="ellipse;fillColor=red;strokeColor=red;fontSize=18;align=center;verticalAlign=middle;" vertex="1" parent="panel3Group">
+          <mxGeometry x="120" y="120" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <!-- Darstellung der Radiowellen als Wellenlinie -->
+        <mxCell id="radiowave" value="" style="edgeStyle=elbowEdgeStyle;dashed=1;strokeColor=#fcba00;endArrow=block;html=1;" edge="1" parent="panel3Group">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="130"/>
+            <mxPoint x="130" y="130"/>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Panel 4: Signalaufnahme und Spektrum -->
+        <mxCell id="panel4Group" value="" style="group" vertex="1" parent="1">
+          <mxGeometry x="20" y="740" width="400" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="panel4Header" value="Panel 4: Signalaufnahme und Spektrum" style="rounded=1;fillColor=#004e9f;strokeColor=none;fontColor=#ffffff;whiteSpace=wrap;html=1;" vertex="1" parent="panel4Group">
+          <mxGeometry x="10" y="10" width="380" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="panel4Text" value="Beim Zurückkehren in ihren Grundzustand geben die Spins Signale ab. Diese Signale werden aufgenommen und in Form eines Spektrums dargestellt. Jedes Atom in einem Molekül erzeugt charakteristische Signale, wodurch Strukturinformationen gewonnen werden." style="text;whiteSpace=wrap;html=1;" vertex="1" parent="panel4Group">
+          <mxGeometry x="10" y="50" width="380" height="40" as="geometry"/>
+        </mxCell>
+        <!-- Darstellung eines NMR-Spektrums -->
+        <mxCell id="spectrum" value="NMR-Spektrum" style="shape=line;strokeWidth=2;strokeColor=#004e9f;html=1;" vertex="1" parent="panel4Group">
+          <mxGeometry x="50" y="120" width="300" height="0" as="geometry"/>
+        </mxCell>
+        <!-- Peaks im Spektrum -->
+        <mxCell id="peak1" value="" style="shape=line;strokeWidth=2;strokeColor=#004e9f;" vertex="1" parent="panel4Group">
+          <mxGeometry x="80" y="110" width="0" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="peak2" value="" style="shape=line;strokeWidth=2;strokeColor=#004e9f;" vertex="1" parent="panel4Group">
+          <mxGeometry x="150" y="100" width="0" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="peak3" value="" style="shape=line;strokeWidth=2;strokeColor=#004e9f;" vertex="1" parent="panel4Group">
+          <mxGeometry x="220" y="120" width="0" height="20" as="geometry"/>
+        </mxCell>
+        <!-- Optionale Darstellung eines NMR-Geräts -->
+        <mxCell id="nmrDevice" value="NMR-Gerät" style="rounded=1;fillColor=#909085;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="panel4Group">
+          <mxGeometry x="320" y="160" width="60" height="40" as="geometry"/>
+        </mxCell>
+        
+        <!-- Infoboxen: kurze Erklärungen zu zentralen Begriffen -->
+        <mxCell id="infoboxGroup" value="Infoboxen" style="group" vertex="1" parent="1">
+          <mxGeometry x="440" y="20" width="150" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="infobox1" value="Kernspin" style="rounded=1;fillColor=#fcba00;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="infoboxGroup">
+          <mxGeometry x="10" y="10" width="130" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="infobox2" value="Magnetfeld" style="rounded=1;fillColor=#fcba00;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="infoboxGroup">
+          <mxGeometry x="10" y="50" width="130" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="infobox3" value="Resonanz" style="rounded=1;fillColor=#fcba00;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="infoboxGroup">
+          <mxGeometry x="10" y="90" width="130" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="infobox4" value="Radiowellen" style="rounded=1;fillColor=#fcba00;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="infoboxGroup">
+          <mxGeometry x="10" y="130" width="130" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="infobox5" value="Chemische Verschiebung" style="rounded=1;fillColor=#fcba00;strokeColor=#004e9f;whiteSpace=wrap;html=1;" vertex="1" parent="infoboxGroup">
+          <mxGeometry x="10" y="170" width="130" height="30" as="geometry"/>
+        </mxCell>
+        
       </root>
     </mxGraphModel>
   </diagram>

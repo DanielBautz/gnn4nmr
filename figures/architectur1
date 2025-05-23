@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36" version="27.0.5">
   <diagram name="Heterogenes GNN Modell" id="model-architecture">
-    <mxGraphModel dx="1303" dy="1616" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="1" shadow="0">
+    <mxGraphModel dx="3473" dy="2930" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="1" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -327,7 +327,7 @@
         <mxCell id="j_Ou23HX3StQcQcxlatY-12" value="C-Knoten&lt;br&gt;(39 Features)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#909085;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
           <mxGeometry x="470" y="1010" width="120" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="j_Ou23HX3StQcQcxlatY-13" value="Others-Knoten&#xa;(16 Features)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#909085;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
+        <mxCell id="j_Ou23HX3StQcQcxlatY-13" value="HetAt-Knoten&lt;br&gt;(16 Features)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#909085;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
           <mxGeometry x="600" y="1010" width="120" height="50" as="geometry" />
         </mxCell>
         <mxCell id="j_Ou23HX3StQcQcxlatY-14" value="Bindungen&#xa;(10 Features)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#909085;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
@@ -364,7 +364,7 @@
         <mxCell id="j_Ou23HX3StQcQcxlatY-22" value="C-Encoder" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004E9F;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
           <mxGeometry x="470" y="1089" width="120" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="j_Ou23HX3StQcQcxlatY-23" value="Others-Encoder" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004E9F;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
+        <mxCell id="j_Ou23HX3StQcQcxlatY-23" value="HetAt-Encoder" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004E9F;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
           <mxGeometry x="600" y="1089" width="120" height="50" as="geometry" />
         </mxCell>
         <mxCell id="j_Ou23HX3StQcQcxlatY-24" value="Edge-Encoder" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#004E9F;strokeColor=none;fontColor=#FFFFFF;shadow=1;" parent="1" vertex="1">
@@ -428,7 +428,7 @@
         <mxCell id="j_Ou23HX3StQcQcxlatY-39" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;opacity=50;" parent="1" vertex="1">
           <mxGeometry x="250" y="1515" width="537" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="j_Ou23HX3StQcQcxlatY-40" value="Ausgabe:" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#909085;fontSize=12;fontStyle=1" parent="1" vertex="1">
+        <mxCell id="j_Ou23HX3StQcQcxlatY-40" value="Korrekturdifferenz:" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#909085;fontSize=12;fontStyle=1" parent="1" vertex="1">
           <mxGeometry x="330" y="1515" width="66" height="30" as="geometry" />
         </mxCell>
         <mxCell id="j_Ou23HX3StQcQcxlatY-41" value="\(\Delta\)\( \delta\) (\(^{1}\)H)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontColor=#004e9f;fontSize=12;fontStyle=1" parent="1" vertex="1">
@@ -459,7 +459,7 @@
         <mxCell id="j_Ou23HX3StQcQcxlatY-46" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#909085;strokeWidth=2;" parent="1" source="j_Ou23HX3StQcQcxlatY-38" target="j_Ou23HX3StQcQcxlatY-42" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="j_Ou23HX3StQcQcxlatY-47" value="&lt;b&gt;Heterogene Beziehungen:&lt;/b&gt;&lt;br&gt;• H → H, H → C, H → Others&lt;br&gt;• C → H, C → C, C → Others&lt;br&gt;• Others → H, Others → C,&lt;div&gt;&amp;nbsp; Others → Others&lt;/div&gt;" style="text;html=1;strokeColor=#909085;fillColor=#ffffff;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontColor=#606060;shadow=1;spacingLeft=5;spacingRight=5;spacingTop=5;spacingBottom=5;" parent="1" vertex="1">
+        <mxCell id="j_Ou23HX3StQcQcxlatY-47" value="&lt;b&gt;Heterogene Beziehungen:&lt;/b&gt;&lt;br&gt;• H → H, H → C, H → HetAt&lt;br&gt;• C → H, C → C, C → HetAt&lt;br&gt;• HetAt→ H, HetAt→ C,&lt;div&gt;&amp;nbsp; HetAt→&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(96, 96, 96), rgb(155, 155, 155));&quot;&gt;HetAt&lt;/span&gt;&lt;/div&gt;" style="text;html=1;strokeColor=#909085;fillColor=#ffffff;align=left;verticalAlign=top;whiteSpace=wrap;rounded=1;fontColor=#606060;shadow=1;spacingLeft=5;spacingRight=5;spacingTop=5;spacingBottom=5;" parent="1" vertex="1">
           <mxGeometry x="767" y="1284" width="183" height="90" as="geometry" />
         </mxCell>
         <mxCell id="j_Ou23HX3StQcQcxlatY-48" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;edgeStyle=orthogonalEdgeStyle;strokeColor=#909085;strokeWidth=2;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="j_Ou23HX3StQcQcxlatY-29" target="j_Ou23HX3StQcQcxlatY-30" edge="1">

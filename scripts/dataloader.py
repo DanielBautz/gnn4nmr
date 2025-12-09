@@ -352,8 +352,17 @@ class ShiftDataset(Dataset):
         
         return data
 
-def create_dataloaders(batch_size=4, root_dir="data", file_name="all_graphs_with_length.pkl", split_ratio=(0.8, 0.1, 0.1),
+def create_dataloaders(batch_size=4, root_dir=None, file_name="all_graphs_with_length.pkl", split_ratio=(0.8, 0.1, 0.1),
                        normalize_node_features=True, normalize_edge_features=True):
+    if root_dir is None:
+        import inspect
+        caller_frame = inspect.stack()[1]
+        caller_file = caller_frame.filename
+        if 'notebooks' in caller_file or 'main.py' not in caller_file:
+            root_dir = os.path.join(os.path.dirname(__file__), "../data")
+        else:
+            # If called from scripts/main.py or similar, use "data"
+            root_dir = "data"
     dataset = ShiftDataset(root_dir=root_dir, file_name=file_name,
                            normalize_node_features=normalize_node_features,
                            normalize_edge_features=normalize_edge_features)

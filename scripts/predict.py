@@ -26,8 +26,8 @@ def predict(model_path, data_path, norm_stats_file='norm_stats.pkl', edge_stats_
     dataset = ShiftDataset(
         root_dir=root_dir or 'data',
         file_name=file_name,
-        normalize_node_features=config.normalize_node_features,
-        normalize_edge_features=config.normalize_edge_features,
+        normalize_node_features=config['normalize_node_features'],
+        normalize_edge_features=config['normalize_edge_features'],
         norm_stats=norm_stats,
         **edge_stats
     )
@@ -40,17 +40,17 @@ def predict(model_path, data_path, norm_stats_file='norm_stats.pkl', edge_stats_
     }
 
     operator_kwargs = {}
-    if config.operator_type == "GATConv" or config.operator_type == "GATv2Conv":
+    if config['operator_type'] == "GATConv" or config['operator_type'] == "GATv2Conv":
         operator_kwargs['add_self_loops'] = False
 
     model = HeteroGNNModel(
         in_dim_dict,
-        hidden_dim=config.hidden_dim,
-        out_dim=config.out_dim,
-        encoder_dropout=config.encoder_dropout,
-        gnnlayer_dropout=config.gnnlayer_dropout,
-        num_gnn_layers=config.num_gnn_layers,
-        operator_type=config.operator_type,
+        hidden_dim=config['hidden_dim'],
+        out_dim=config['out_dim'],
+        encoder_dropout=config['encoder_dropout'],
+        gnnlayer_dropout=config['gnnlayer_dropout'],
+        num_gnn_layers=config['num_gnn_layers'],
+        operator_type=config['operator_type'],
         operator_kwargs=operator_kwargs,
         edge_in_dim=10
     )
@@ -150,6 +150,6 @@ if __name__ == "__main__":
         config = pickle.load(f)
 
     if args.model is None:
-        args.model = f"{config.operator_type}_best_model.pt"
+        args.model = f"{config['operator_type']}_best_model.pt"
 
     predict(args.model, args.data, args.norm_stats, args.edge_stats, args.output)

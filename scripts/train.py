@@ -247,15 +247,17 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
     """
     # Save normalization stats and config for prediction
     original_dataset = train_loader.dataset.dataset
-    pickle.dump(original_dataset.norm_stats, open('models/norm_stats.pkl', 'wb'))
+    models_dir = os.path.join(os.path.dirname(__file__), "../models")
+    os.makedirs(models_dir, exist_ok=True)
+    pickle.dump(original_dataset.norm_stats, open(os.path.join(models_dir, 'norm_stats.pkl'), 'wb'))
     edge_stats = {
         'edge_length_mean': original_dataset.edge_length_mean,
         'edge_length_std': original_dataset.edge_length_std,
         'edge_order_mean': original_dataset.edge_order_mean,
         'edge_order_std': original_dataset.edge_order_std
     }
-    pickle.dump(edge_stats, open('models/edge_stats.pkl', 'wb'))
-    pickle.dump(dict(config), open('models/config.pkl', 'wb'))
+    pickle.dump(edge_stats, open(os.path.join(models_dir, 'edge_stats.pkl'), 'wb'))
+    pickle.dump(vars(config) if hasattr(config, '__dict__') else config, open(os.path.join(models_dir, 'config.pkl'), 'wb'))
     if config.optimizer == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     elif config.optimizer == "SGD":
@@ -264,7 +266,7 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         raise ValueError(f"Unsupported optimizer: {config.optimizer}")
         
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=config.scheduler_factor, patience=config.scheduler_patience, verbose=True
+        optimizer, mode='min', factor=config.scheduler_factor, patience=config.scheduler_patience
     )
     
     best_val_score = float('inf')
@@ -280,20 +282,21 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         )
         
         scheduler.step(val_score)
-        
-        wandb.log({
-            "epoch": epoch,
-            "train_mse_C": train_mse_C,
-            "train_mae_C": train_mae_C,
-            "train_mse_H": train_mse_H,
-            "train_mae_H": train_mae_H,
-            "val_mse_C": val_mse_C,
-            "val_mae_C": val_mae_C,
-            "val_mse_H": val_mse_H,
-            "val_mae_H": val_mae_H,
-            "val_score": val_score,
-            "lr": optimizer.param_groups[0]["lr"]
-        })
+
+        if wandb.run is not None:
+            wandb.log({
+                "epoch": epoch,
+                "train_mse_C": train_mse_C,
+                "train_mae_C": train_mae_C,
+                "train_mse_H": train_mse_H,
+                "train_mae_H": train_mae_H,
+                "val_mse_C": val_mse_C,
+                "val_mae_C": val_mae_C,
+                "val_mse_H": val_mse_H,
+                "val_mae_H": val_mae_H,
+                "val_score": val_score,
+                "lr": optimizer.param_groups[0]["lr"]
+            })
         
         print(f"Epoch [{epoch+1}/{config.num_epochs}]")
         print(f"  Train   => H: MSE={train_mse_H:.4f}, MAE={train_mae_H:.4f} |"
@@ -304,7 +307,7 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         if val_score <= best_val_score:
             best_val_score = val_score
             print("New best validation score, saving model...")
-            torch.save(model.state_dict(), f"models/{config.operator_type}_best_model.pt")
+            torch.save(model.state_dict(), os.path.join(models_dir, f"{config.operator_type}_best_model.pt"))
             early_stopping_counter = 0
         else:
             early_stopping_counter += 1
@@ -314,15 +317,16 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
                 break
     print("Training completed.")
     
-    model.load_state_dict(torch.load(f"{config.operator_type}_best_model.pt"))
+    model.load_state_dict(torch.load(os.path.join(models_dir, f"{config.operator_type}_best_model.pt")))
     test_mse_H, test_mae_H, test_mse_C, test_mae_C, _ = evaluate_with_config(model, test_loader, device, config)
-    
-    wandb.log({
-        "test_mse_C": test_mse_C,
-        "test_mae_C": test_mae_C,
-        "test_mse_H": test_mse_H,
-        "test_mae_H": test_mae_H
-    })
+
+    if wandb.run is not None:
+        wandb.log({
+            "test_mse_C": test_mse_C,
+            "test_mae_C": test_mae_C,
+            "test_mse_H": test_mse_H,
+            "test_mae_H": test_mae_H
+        })
     
     print(f"** Test ** => H: MSE={test_mse_H:.4f}, MAE={test_mae_H:.4f} |"
           f"  C: MSE={test_mse_C:.4f}, MAE={test_mae_C:.4f}")

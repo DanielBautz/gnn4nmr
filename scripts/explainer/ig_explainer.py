@@ -175,7 +175,7 @@ def batch_ig_analysis(
             progress_callback(f"Processing graph {graph_idx}...")
 
         data = dataset[graph_idx].to(device)
-        x_dict, edge_index_dict, edge_attr_dict, y_dict, atom_index_dict = heterodata_to_dicts(data)
+        x_dict, edge_index_dict, edge_attr_dict, y_dict = heterodata_to_dicts(data)
 
         # Get all nodes of the specified type
         if node_type not in x_dict:

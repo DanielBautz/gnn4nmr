@@ -36,7 +36,7 @@ def get_h_features(attrs):
     #feats.append(attrs.get('no_HYN', 0.0))
     #feats.append(attrs.get('no_HYO', 0.0))
     #feats.append(attrs.get('dist_HC', 0.0))
-    feats.append(attrs.get('shift_low_neighbor_C', 0.0))
+    #feats.append(attrs.get('shift_low_neighbor_C', 0.0))
     feats.append(attrs.get('shielding_dia', 0.0))
     feats.append(attrs.get('shielding_para', 0.0))
     feats.append(attrs.get('span', 0.0))

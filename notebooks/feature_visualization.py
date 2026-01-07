@@ -4,13 +4,12 @@ import numpy as np
 def get_feature_names(node_type):
     """Map feature indices to readable German names."""
     if node_type == 'H':
-        names = (['H', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] +
-                ['Masse', 'Formalladung', 'Grad', 'NMR-Shift', 'CN(X)',
-                 'Shift_NC', 'Dia_Abschirm', 'Para_Abschirm', 'Span', 'Skew',
+        names = (['H', 'C','Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] +
+                ['Masse', 'Formalladung', 'Grad', 'NMR-Shift', 'CN(X)', 'Dia_Abschirm', 'Para_Abschirm', 'Span', 'Skew',
                  'Asymmetrie', 'Anisotropie', 'Mull_Ladung', 'Loew_Ladung',
                  'Mull_s', 'Mull_p', 'Loew_s', 'Loew_p', 'BO_Loew', 'BO_Mayer', 'Mayer_VA'])
     elif node_type == 'C':
-        names = (['H', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] +
+        names = (['H', 'C', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] +
                 ['Masse', 'Formalladung', 'Grad', 'NMR-Shift', 'CN(X)',
                  'Dia_Abschirm', 'Para_Abschirm', 'Span', 'Skew', 'Asymmetrie', 'Anisotropie',
                  'Mull_Ladung', 'Loew_Ladung', 'Mull_s', 'Mull_p', 'Mull_d', 'Mull_p_std',

@@ -10,7 +10,7 @@ from model import HeteroGNNModel
 
 # Default dimensionalities that are used when instantiating the hetero model.
 DEFAULT_IN_DIM_DICT: Dict[str, int] = {
-    "H": 34,
+    "H": 33,
     "C": 39,
     "Others": 16,
 }

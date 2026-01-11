@@ -16,7 +16,7 @@ def get_feature_names(node_type):
                  'Loew_s', 'Loew_p', 'Loew_d', 'Loew_p_std', 'BO_Loew_Sum', 'BO_Loew_Avg',
                  'BO_Mayer_Sum', 'BO_Mayer_Avg', 'Mayer_VA'])
     else:
-        names = ['H', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] + ['Masse', 'Formalladung', 'Grad']
+        names = ['H', 'C', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] + ['Masse', 'Formalladung', 'Grad']
 
     return names
 
@@ -66,7 +66,7 @@ def plot_feature_importance(batch_results, show_all=True):
             plt.yticks(range(len(sorted_names_abs)), sorted_names_abs, fontsize=8)
             plt.xlabel('Absolute durchschnittliche Wichtigkeit', fontsize=12)
             plt.ylabel('Features', fontsize=12)
-            plt.title(f'Absolute Feature-Wichtigkeit für {node_type}-Atome ({abs_importance_type})', fontsize=14)
+            plt.title(f'Absolute Feature-Wichtigkeit für {node_type}-Atom ({abs_importance_type})', fontsize=14)
             plt.grid(axis='x', alpha=0.3)
 
             # Add value labels on bars
@@ -108,9 +108,9 @@ def plot_feature_importance(batch_results, show_all=True):
                        color=bar_colors, alpha=0.7)
 
         plt.yticks(range(len(sorted_names_signed)), sorted_names_signed, fontsize=8)
-        plt.xlabel('Durchschnittliche Wichtigkeit', fontsize=12)
+        plt.xlabel('Wichtigkeit', fontsize=12)
         plt.ylabel('Features', fontsize=12)
-        plt.title(f'Feature-Wichtigkeit {title_suffix} für {node_type}-Atome'.strip(), fontsize=14)
+        plt.title(f'Feature-Wichtigkeit {title_suffix} für {node_type}-Atom'.strip(), fontsize=14)
         plt.grid(axis='x', alpha=0.3)
 
         # Add zero line only for IG (since it can have negative values)

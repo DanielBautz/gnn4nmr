@@ -4,19 +4,20 @@ import numpy as np
 def get_feature_names(node_type):
     """Map feature indices to readable German names."""
     if node_type == 'H':
-        names = (['H', 'C','Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] +
-                ['Masse', 'Formalladung', 'Grad', 'NMR-Shift', 'CN(X)', 'Dia_Abschirm', 'Para_Abschirm', 'Span', 'Skew',
-                 'Asymmetrie', 'Anisotropie', 'Mull_Ladung', 'Loew_Ladung',
-                 'Mull_s', 'Mull_p', 'Loew_s', 'Loew_p', 'BO_Loew', 'BO_Mayer', 'Mayer_VA'])
+        names = (['H', 'C', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] +
+                ['mass', 'formal_charge', 'degree', 'shift_low', 'CN(X)', 'shielding_dia', 'shielding_para', 'span', 'skew',
+                 'asymmetry', 'anisotropy', 'at_charge_mull', 'at_charge_loew',
+                 'orb_charge_mull_s', 'orb_charge_mull_p', 'orb_charge_loew_s', 'orb_charge_loew_p',
+                 'BO_loew', 'BO_mayer', 'mayer_VA'])
     elif node_type == 'C':
         names = (['H', 'C', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] +
-                ['Masse', 'Formalladung', 'Grad', 'NMR-Shift', 'CN(X)',
-                 'Dia_Abschirm', 'Para_Abschirm', 'Span', 'Skew', 'Asymmetrie', 'Anisotropie',
-                 'Mull_Ladung', 'Loew_Ladung', 'Mull_s', 'Mull_p', 'Mull_d', 'Mull_p_std',
-                 'Loew_s', 'Loew_p', 'Loew_d', 'Loew_p_std', 'BO_Loew_Sum', 'BO_Loew_Avg',
-                 'BO_Mayer_Sum', 'BO_Mayer_Avg', 'Mayer_VA'])
+                ['mass', 'formal_charge', 'degree', 'shift_low', 'CN(X)',
+                 'shielding_dia', 'shielding_para', 'span', 'skew', 'asymmetry', 'anisotropy',
+                 'at_charge_mull', 'at_charge_loew', 'orb_charge_mull_s', 'orb_charge_mull_p', 'orb_charge_mull_d', 'orb_stdev_mull_p',
+                 'orb_charge_loew_s', 'orb_charge_loew_p', 'orb_charge_loew_d', 'orb_stdev_loew_p',
+                 'BO_loew_sum', 'BO_loew_av', 'BO_mayer_sum', 'BO_mayer_av', 'mayer_VA'])
     else:
-        names = ['H', 'C', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] + ['Masse', 'Formalladung', 'Grad']
+        names = ['H', 'C', 'Li', 'B', 'N', 'O', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl'] + ['mass', 'formal_charge', 'degree']
 
     return names
 
@@ -63,7 +64,7 @@ def plot_feature_importance(batch_results, show_all=True):
             bars = plt.barh(range(len(sorted_names_abs)), sorted_values_abs,
                            color=colors.get(node_type, 'gray'), alpha=0.7)
 
-            plt.yticks(range(len(sorted_names_abs)), sorted_names_abs, fontsize=8)
+            plt.yticks(range(len(sorted_names_abs)), sorted_names_abs, fontsize=11)
             plt.xlabel('Absolute durchschnittliche Wichtigkeit', fontsize=12)
             plt.ylabel('Features', fontsize=12)
             plt.title(f'Absolute Feature-Wichtigkeit für {node_type}-Atom ({abs_importance_type})', fontsize=14)
@@ -107,7 +108,7 @@ def plot_feature_importance(batch_results, show_all=True):
         bars = plt.barh(range(len(sorted_names_signed)), sorted_values_signed,
                        color=bar_colors, alpha=0.7)
 
-        plt.yticks(range(len(sorted_names_signed)), sorted_names_signed, fontsize=8)
+        plt.yticks(range(len(sorted_names_signed)), sorted_names_signed, fontsize=13)
         plt.xlabel('Wichtigkeit', fontsize=12)
         plt.ylabel('Features', fontsize=12)
         plt.title(f'Feature-Wichtigkeit {title_suffix} für {node_type}-Atom'.strip(), fontsize=14)
@@ -157,10 +158,10 @@ def plot_single_feature_importance(feature_importance, node_type, title_suffix="
     bars = plt.barh(range(len(sorted_names)), sorted_values,
                    color='blue', alpha=0.7)
 
-    plt.yticks(range(len(sorted_names)), sorted_names, fontsize=8)
-    plt.xlabel('Wichtigkeit', fontsize=12)
-    plt.ylabel('Features', fontsize=12)
-    plt.title(f'Alle Features nach Wichtigkeit für {node_type}-Atom{title_suffix}', fontsize=14)
+    plt.yticks(range(len(sorted_names)), sorted_names, fontsize=16)
+    plt.xlabel('Wichtigkeit', fontsize=16)
+    plt.ylabel('Features', fontsize=16)
+    plt.title(f'Alle Features nach Wichtigkeit für {node_type}-Atom{title_suffix}', fontsize=16)
     plt.grid(axis='x', alpha=0.3)
 
     # Add value labels on bars (only for significant values)
@@ -169,7 +170,7 @@ def plot_single_feature_importance(feature_importance, node_type, title_suffix="
         if abs(value) > max_value * 0.01:  # Only show labels for values > 1% of max
             plt.text(bar.get_width() + max_value * 0.005,
                     bar.get_y() + bar.get_height()/2,
-                    f'{value:.3f}', ha='left', va='center', fontsize=6)
+                    f'{value:.3f}', ha='left', va='center', fontsize=9)
 
     plt.tight_layout()
     plt.show()

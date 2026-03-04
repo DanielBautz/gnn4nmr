@@ -6,12 +6,33 @@ from model import HeteroGNNModel
 from dataloader import ShiftDataset
 from operators import get_conv_operator
 
+DEFAULT_IN_DIM_DICT = {
+    "H": 33,
+    "C": 39,
+    "Others": 16,
+}
+
+def normalize_loaded_config(config):
+    if isinstance(config, dict):
+        return config
+    if hasattr(config, 'as_dict') and callable(config.as_dict):
+        as_dict = config.as_dict()
+        if isinstance(as_dict, dict):
+            return as_dict
+    if hasattr(config, '__dict__'):
+        return dict(vars(config))
+    try:
+        return dict(config)
+    except Exception as exc:
+        raise TypeError(f"Could not normalize config object of type {type(config)}") from exc
+
+
 def predict(model_path, data_path, norm_stats_file='norm_stats.pkl', edge_stats_file='edge_stats.pkl', output_file='predictions.csv'):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Load config
     with open('config.pkl', 'rb') as f:
-        config = pickle.load(f)
+        config = normalize_loaded_config(pickle.load(f))
 
     # Load stats
     with open(norm_stats_file, 'rb') as f:
@@ -33,11 +54,7 @@ def predict(model_path, data_path, norm_stats_file='norm_stats.pkl', edge_stats_
     )
 
     # Create model
-    in_dim_dict = {
-        "H": 34,
-        "C": 39,
-        "Others": 16
-    }
+    in_dim_dict = config.get('in_dim_dict', DEFAULT_IN_DIM_DICT)
 
     operator_kwargs = {}
     if config['operator_type'] == "GATConv" or config['operator_type'] == "GATv2Conv":
@@ -147,7 +164,7 @@ if __name__ == "__main__":
 
     # Load config to get operator_type if model not specified
     with open('config.pkl', 'rb') as f:
-        config = pickle.load(f)
+        config = normalize_loaded_config(pickle.load(f))
 
     if args.model is None:
         args.model = f"{config['operator_type']}_best_model.pt"

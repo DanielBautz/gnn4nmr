@@ -82,13 +82,13 @@ def get_c_features(attrs):
     feats.append(attrs.get('at_charge_loew', 0.0))
     feats.append(attrs.get('orb_charge_mull_s', 0.0))
     feats.append(attrs.get('orb_charge_mull_p', 0.0))
-    feats.append(attrs.get('orb_charge_mull_d', 0.0))
-    feats.append(attrs.get('orb_stdev_mull_p', 0.0))
+    feats.append(attrs.get('orb_charge_mull_d', 0.0)) 
+    feats.append(attrs.get('orb_stdev_mull_p', 0.0)) 
     feats.append(attrs.get('orb_charge_loew_s', 0.0))
     feats.append(attrs.get('orb_charge_loew_p', 0.0))
     feats.append(attrs.get('orb_charge_loew_d', 0.0))
     feats.append(attrs.get('orb_stdev_loew_p', 0.0))
-    feats.append(attrs.get('BO_loew_sum', 0.0))
+    feats.append(attrs.get('BO_loew_sum', 0.0)) #hier nochmal gucken was das ist
     feats.append(attrs.get('BO_loew_av', 0.0))
     feats.append(attrs.get('BO_mayer_sum', 0.0))
     feats.append(attrs.get('BO_mayer_av', 0.0))
@@ -117,7 +117,7 @@ class ShiftDataset(Dataset):
         
         self.normalize_node_features = normalize_node_features
         self.normalize_edge_features = normalize_edge_features
-        
+
         # Node Normalisierung: Berechne global Normalisierungsstatistiken für die kontinuierlichen Features (ab Index 13)
         if self.normalize_node_features:
             if norm_stats is not None:
@@ -388,6 +388,7 @@ def create_dataloaders(batch_size=4, root_dir=None, file_name="all_graphs_with_l
     val_compounds = compounds[train_end:val_end]
     test_compounds = compounds[val_end:]
 
+    #print("BO_mayer_av")
     print("Train")
     print(train_compounds)
     print("Val")

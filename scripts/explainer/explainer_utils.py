@@ -84,7 +84,8 @@ def build_model_from_config(
     device: torch.device,
     in_dim_dict: Optional[Dict[str, int]] = None,
 ) -> HeteroGNNModel:
-    in_dim_dict = in_dim_dict or DEFAULT_IN_DIM_DICT
+    config_in_dim_dict = _get_config_value(config, "in_dim_dict", None)
+    in_dim_dict = in_dim_dict or config_in_dim_dict or DEFAULT_IN_DIM_DICT
     operator_kwargs = _get_config_value(config, "operator_kwargs", {}) or {}
     operator_type = _get_config_value(config, "operator_type", "SAGEConv")
     if operator_type in {"GATConv", "GATv2Conv"}:

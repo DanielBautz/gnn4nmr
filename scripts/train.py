@@ -6,6 +6,49 @@ import pandas as pd
 import pickle
 from pathlib import Path
 
+REQUIRED_CONFIG_KEYS = (
+    'seed',
+    'batch_size',
+    'num_epochs',
+    'lr',
+    'hidden_dim',
+    'out_dim',
+    'num_gnn_layers',
+    'operator_type',
+    'operator_kwargs',
+    'encoder_dropout',
+    'gnnlayer_dropout',
+    'optimizer',
+    'weight_decay',
+    'scheduler_factor',
+    'scheduler_patience',
+    'loss_weight_H',
+    'loss_weight_C',
+    'normalize_node_features',
+    'normalize_edge_features',
+    'split_ratio',
+    'output_detailed_predictions',
+    'output_dir',
+)
+
+
+def _config_get(config, key, default=None):
+    if isinstance(config, dict):
+        return config.get(key, default)
+    return getattr(config, key, default)
+
+
+def extract_training_config(config):
+    """
+    Normalisiert beliebige Config-Objekte auf ein kanonisches Dict
+    für persistente Speicherung.
+    """
+    config_dict = {key: _config_get(config, key, None) for key in REQUIRED_CONFIG_KEYS}
+    missing = [key for key, value in config_dict.items() if value is None]
+    if missing:
+        raise ValueError(f"Missing required config keys: {', '.join(missing)}")
+    return config_dict
+
 def compute_metrics(pred, target):
     """Berechnet MSE und MAE."""
     mse = F.mse_loss(pred, target)
@@ -257,7 +300,8 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
         'edge_order_std': original_dataset.edge_order_std
     }
     pickle.dump(edge_stats, open(os.path.join(models_dir, 'edge_stats.pkl'), 'wb'))
-    pickle.dump(vars(config) if hasattr(config, '__dict__') else config, open(os.path.join(models_dir, 'config.pkl'), 'wb'))
+    config_dict = extract_training_config(config)
+    pickle.dump(config_dict, open(os.path.join(models_dir, 'config.pkl'), 'wb'))
     if config.optimizer == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     elif config.optimizer == "SGD":

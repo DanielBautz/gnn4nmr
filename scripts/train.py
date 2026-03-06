@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import pickle
 from pathlib import Path
+from datetime import datetime
 
 REQUIRED_CONFIG_KEYS = (
     'seed',
@@ -282,6 +283,64 @@ def evaluate_with_detailed_output(model, dataset, indices, device, csv_file):
     print(f"Detaillierte Testergebnisse wurden in {csv_file} gespeichert.")
     return df
 
+
+def _save_split_artifacts(models_dir, dataset, train_loader, val_loader, test_loader, split_ratio):
+    """
+    Persist split information and split datasets to models/ for downstream explainability.
+
+    Saved files:
+      - graph_split.pkl
+      - train_graph_indices.pkl, val_graph_indices.pkl, test_graph_indices.pkl
+      - train_data.pkl, val_data.pkl, test_data.pkl
+    """
+    train_indices = list(getattr(train_loader.dataset, "indices", []))
+    val_indices = list(getattr(val_loader.dataset, "indices", []))
+    test_indices = list(getattr(test_loader.dataset, "indices", []))
+
+    train_indices = sorted(int(i) for i in train_indices)
+    val_indices = sorted(int(i) for i in val_indices)
+    test_indices = sorted(int(i) for i in test_indices)
+
+    split_info = {
+        "train_graph_indices": train_indices,
+        "val_graph_indices": val_indices,
+        "test_graph_indices": test_indices,
+        "split_ratio": tuple(split_ratio) if split_ratio is not None else None,
+        "num_graphs": len(dataset),
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "data_file": getattr(dataset, "file_path", None),
+    }
+
+    graph_split_path = os.path.join(models_dir, "graph_split.pkl")
+    with open(graph_split_path, "wb") as f:
+        pickle.dump(split_info, f)
+
+    with open(os.path.join(models_dir, "train_graph_indices.pkl"), "wb") as f:
+        pickle.dump(train_indices, f)
+    with open(os.path.join(models_dir, "val_graph_indices.pkl"), "wb") as f:
+        pickle.dump(val_indices, f)
+    with open(os.path.join(models_dir, "test_graph_indices.pkl"), "wb") as f:
+        pickle.dump(test_indices, f)
+
+    # Save actual split graph lists for reproducible downstream analysis.
+    # This can be large, but it is requested for train/val/test access.
+    train_graphs = [dataset.nx_graphs[i] for i in train_indices]
+    val_graphs = [dataset.nx_graphs[i] for i in val_indices]
+    test_graphs = [dataset.nx_graphs[i] for i in test_indices]
+
+    with open(os.path.join(models_dir, "train_data.pkl"), "wb") as f:
+        pickle.dump(train_graphs, f)
+    with open(os.path.join(models_dir, "val_data.pkl"), "wb") as f:
+        pickle.dump(val_graphs, f)
+    with open(os.path.join(models_dir, "test_data.pkl"), "wb") as f:
+        pickle.dump(test_graphs, f)
+
+    print(f"Datensplit gespeichert: {graph_split_path}")
+    print(
+        "Split Größen => "
+        f"Train: {len(train_indices)}, Val: {len(val_indices)}, Test: {len(test_indices)}"
+    )
+
 def train_model(model, train_loader, val_loader, test_loader, device, config):
     """
     Haupttrainingsschleife:
@@ -302,6 +361,17 @@ def train_model(model, train_loader, val_loader, test_loader, device, config):
     pickle.dump(edge_stats, open(os.path.join(models_dir, 'edge_stats.pkl'), 'wb'))
     config_dict = extract_training_config(config)
     pickle.dump(config_dict, open(os.path.join(models_dir, 'config.pkl'), 'wb'))
+
+    split_ratio = _config_get(config, "split_ratio", None)
+    _save_split_artifacts(
+        models_dir=models_dir,
+        dataset=original_dataset,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        test_loader=test_loader,
+        split_ratio=split_ratio,
+    )
+
     if config.optimizer == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
     elif config.optimizer == "SGD":

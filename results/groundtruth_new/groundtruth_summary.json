@@ -1,0 +1,11 @@
+{
+  "n_all_runs": 49,
+  "n_successful_runs": 49,
+  "n_failed_runs": 0,
+  "n_groundtruth_rows": 48,
+  "outputs": {
+    "all_runs_metrics": "/home/bautz/gnn4nmr/results/groundtruth_new/all_runs_metrics.csv",
+    "groundtruth_h_predictions": "/home/bautz/gnn4nmr/results/groundtruth_new/groundtruth_h_predictions.csv",
+    "groundtruth_c_predictions": "/home/bautz/gnn4nmr/results/groundtruth_new/groundtruth_c_predictions.csv"
+  }
+}

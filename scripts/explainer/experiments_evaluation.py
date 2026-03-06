@@ -488,8 +488,6 @@ def exp_feature_fidelity_for_node(
 def filter_edges_by_mask(
     edge_index_dict: Dict[Tuple[str, str, str], torch.Tensor],
     edge_attr_dict: Optional[Dict[Tuple[str, str, str], torch.Tensor]],
-    node_type: str,
-    node_idx: int,
     selected_positions: Dict[Tuple[str, str, str], Set[int]],
     mode: str,
 ) -> Tuple[Dict[Tuple[str, str, str], torch.Tensor], Optional[Dict[Tuple[str, str, str], torch.Tensor]]]:
@@ -497,14 +495,7 @@ def filter_edges_by_mask(
     new_edge_attr_dict: Optional[Dict[Tuple[str, str, str], torch.Tensor]] = {} if edge_attr_dict is not None else None
 
     for edge_type, edge_index in edge_index_dict.items():
-        src_type, _, dst_type = edge_type
         num_edges = int(edge_index.size(1))
-
-        incident = torch.zeros(num_edges, dtype=torch.bool, device=edge_index.device)
-        if src_type == node_type:
-            incident = incident | (edge_index[0] == node_idx)
-        if dst_type == node_type:
-            incident = incident | (edge_index[1] == node_idx)
 
         selected = torch.zeros(num_edges, dtype=torch.bool, device=edge_index.device)
         selected_set = selected_positions.get(edge_type, set())
@@ -517,7 +508,7 @@ def filter_edges_by_mask(
         if mode == "drop_selected":
             keep_mask = ~selected
         elif mode == "keep_selected":
-            keep_mask = (~incident) | selected
+            keep_mask = selected
         else:
             raise ValueError(f"Unknown edge mask mode: {mode}")
 
@@ -541,42 +532,31 @@ def exp_gnn_edge_fidelity_for_node(
     pred_orig: Optional[float] = None,
     target_value: float = float("nan"),
 ) -> Optional[Dict[str, float]]:
-    incident_entries: List[Tuple[float, Tuple[str, str, str], int]] = []
+    all_edge_entries: List[Tuple[float, Tuple[str, str, str], int]] = []
 
     for edge_type, edge_mask in edge_mask_dict.items():
         if edge_mask is None or edge_type not in edge_index_dict:
             continue
 
         edge_index = edge_index_dict[edge_type]
-        src_type, _, dst_type = edge_type
 
         mask_vals = edge_mask.view(-1).detach().cpu()
-        rows = edge_index[0].detach().cpu()
-        cols = edge_index[1].detach().cpu()
 
         limit = min(int(mask_vals.shape[0]), int(edge_index.size(1)))
         for pos in range(limit):
-            is_incident = False
-            if src_type == node_type and int(rows[pos]) == node_idx:
-                is_incident = True
-            if dst_type == node_type and int(cols[pos]) == node_idx:
-                is_incident = True
-            if not is_incident:
-                continue
-
             score_abs = float(abs(mask_vals[pos].item()))
-            incident_entries.append((score_abs, edge_type, int(pos)))
+            all_edge_entries.append((score_abs, edge_type, int(pos)))
 
-    total_incident = len(incident_entries)
-    if total_incident == 0:
+    total_edges_considered = len(all_edge_entries)
+    if total_edges_considered == 0:
         return None
 
     keep_ratio = min(max(1.0 - float(sparsity), 0.0), 1.0)
-    k_keep = max(1, int(math.ceil(keep_ratio * total_incident)))
-    k_keep = min(k_keep, total_incident)
+    k_keep = max(1, int(math.ceil(keep_ratio * total_edges_considered)))
+    k_keep = min(k_keep, total_edges_considered)
 
-    incident_entries.sort(key=lambda item: item[0], reverse=True)
-    selected_entries = incident_entries[:k_keep]
+    all_edge_entries.sort(key=lambda item: item[0], reverse=True)
+    selected_entries = all_edge_entries[:k_keep]
     selected_positions: Dict[Tuple[str, str, str], Set[int]] = {}
     for _, edge_type, edge_pos in selected_entries:
         selected_positions.setdefault(edge_type, set()).add(edge_pos)
@@ -584,16 +564,12 @@ def exp_gnn_edge_fidelity_for_node(
     edge_idx_drop, edge_attr_drop = filter_edges_by_mask(
         edge_index_dict=edge_index_dict,
         edge_attr_dict=edge_attr_dict,
-        node_type=node_type,
-        node_idx=node_idx,
         selected_positions=selected_positions,
         mode="drop_selected",
     )
     edge_idx_keep, edge_attr_keep = filter_edges_by_mask(
         edge_index_dict=edge_index_dict,
         edge_attr_dict=edge_attr_dict,
-        node_type=node_type,
-        node_idx=node_idx,
         selected_positions=selected_positions,
         mode="keep_selected",
     )
@@ -653,9 +629,9 @@ def exp_gnn_edge_fidelity_for_node(
         "fid_minus_model": float(fid_minus_model),
         "fid_plus_error_delta": float(fid_plus_error_delta),
         "fid_minus_error_delta": float(fid_minus_error_delta),
-        "n_incident_edges": int(total_incident),
-        "k_incident_edges": int(k_keep),
-        "actual_sparsity_edge": float(actual_sparsity(total_incident, k_keep)),
+        "n_edges_considered": int(total_edges_considered),
+        "k_edges": int(k_keep),
+        "actual_sparsity_edge": float(actual_sparsity(total_edges_considered, k_keep)),
     }
 
 
@@ -1152,6 +1128,9 @@ def run_experiments_evaluation(
         "gnn_explanation_type": gnn_explanation_type,
         "gnn_use_custom_coeffs": bool(gnn_use_custom_coeffs),
         "ig_n_steps": int(ig_n_steps),
+        "gnn_edge_selection_scope": "global_all_edges",
+        "gnn_edge_keep_mode": "topk_only",
+        "gnn_edge_ranking": "abs(edge_mask)",
         "max_graphs": int(max_graphs) if max_graphs is not None else None,
         "max_nodes_per_graph": int(max_nodes_per_graph),
         "rows_node_metrics": int(len(node_df)),

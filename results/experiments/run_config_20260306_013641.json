@@ -1,0 +1,38 @@
+{
+  "timestamp": "20260306_013641",
+  "model_path": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\models\\GraphConv_best_model.pt",
+  "data_path": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\data\\all_graphs_with_length.pkl",
+  "split_path": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\models\\graph_split.pkl",
+  "graph_scope": "full_dataset",
+  "graph_source": "full_dataset",
+  "first_graph_per_component": true,
+  "component_key": "compound",
+  "graph_count_before_component_filter": 940,
+  "graph_count_after_component_filter": 94,
+  "graphs_evaluated": 94,
+  "node_types": [
+    "H",
+    "C"
+  ],
+  "sparsity_target": 0.9,
+  "mask_baseline_mode": "match_ig_baseline",
+  "ig_baseline_mode": "scientific",
+  "gnn_epochs": 200,
+  "gnn_lr": 0.01,
+  "gnn_explanation_type": "phenomenon",
+  "gnn_use_custom_coeffs": false,
+  "ig_n_steps": 64,
+  "max_graphs": null,
+  "max_nodes_per_graph": 0,
+  "rows_node_metrics": 2173,
+  "rows_gnn_edge": 1066,
+  "rows_failures": 41,
+  "shared_nodes_count": 1066,
+  "artifacts": {
+    "node_level_metrics": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\node_level_metrics_20260306_013641.csv",
+    "summary_by_method_and_type": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\summary_by_method_and_type_20260306_013641.csv",
+    "fair_comparison_H_C": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\fair_comparison_H_C_20260306_013641.csv",
+    "gnn_edge_summary": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\gnn_edge_summary_20260306_013641.csv",
+    "failed_nodes": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\failed_nodes_20260306_013641.csv"
+  }
+}

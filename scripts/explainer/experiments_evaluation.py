@@ -12,6 +12,10 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 import numpy as np
 import pandas as pd
 import torch
+try:
+    from tqdm.auto import tqdm as _tqdm_auto
+except Exception:
+    _tqdm_auto = None
 from torch_geometric.explain import Explainer
 from torch_geometric.explain.algorithm import GNNExplainer
 from torch_geometric.explain.config import (
@@ -47,6 +51,20 @@ class ExperimentContext:
     edge_stats_path: Path
     split_path: Path
     output_dir: Path
+
+
+def safe_tqdm(
+    iterable,
+    total: Optional[int],
+    desc: str,
+    enabled: bool = True,
+    use_tqdm: bool = True,
+):
+    if not enabled:
+        return iterable
+    if use_tqdm and _tqdm_auto is not None:
+        return _tqdm_auto(iterable, total=total, desc=desc, leave=False)
+    return iterable
 
 
 def resolve_path(path_like: str, root: Optional[Path] = None) -> Path:
@@ -713,6 +731,8 @@ def run_experiments_evaluation(
     include_gnn_edge_report: bool = True,
     seed: int = 42,
     verbose: bool = True,
+    progress_enabled: bool = True,
+    progress_use_tqdm: bool = True,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     clean_node_types = [nt for nt in node_types if nt in EXP_ALLOWED_NODE_TYPES]
     if not clean_node_types:
@@ -806,7 +826,17 @@ def run_experiments_evaluation(
     edge_rows: List[Dict[str, Any]] = []
     failure_rows: List[Dict[str, Any]] = []
 
-    for graph_idx in eval_graph_indices:
+    graph_total = int(len(eval_graph_indices))
+    graph_iter = safe_tqdm(
+        eval_graph_indices,
+        total=graph_total,
+        desc="Graph evaluation",
+        enabled=bool(progress_enabled),
+        use_tqdm=bool(progress_use_tqdm),
+    )
+    for graph_pos, graph_idx in enumerate(graph_iter, start=1):
+        if verbose and (not progress_enabled or not progress_use_tqdm):
+            print(f"[graphs] {graph_pos}/{graph_total}: graph_idx={graph_idx}")
         data = dataset[graph_idx].to(device)
         x_dict_raw, edge_index_dict, edge_attr_dict_raw, y_dict = heterodata_to_dicts(data)
 
@@ -843,10 +873,42 @@ def run_experiments_evaluation(
             )
 
             if gnn_use_custom_coeffs and gnn_coeffs:
+                custom_coeffs = {key: float(value) for key, value in dict(gnn_coeffs).items()}
+
+                def _coeffs_applied(algo: Any) -> bool:
+                    algo_coeffs = getattr(algo, "coeffs", None)
+                    if not isinstance(algo_coeffs, dict):
+                        return False
+                    for key, expected in custom_coeffs.items():
+                        if key not in algo_coeffs:
+                            return False
+                        actual = algo_coeffs[key]
+                        if not np.isclose(float(actual), float(expected), rtol=0.0, atol=0.0):
+                            return False
+                    return True
+
+                algorithm = None
+
+                # Preferred on modern PyG: coefficients as explicit kwargs.
                 try:
-                    algorithm = GNNExplainer(epochs=gnn_epochs, lr=gnn_lr, coeffs=gnn_coeffs)
+                    candidate = GNNExplainer(epochs=gnn_epochs, lr=gnn_lr, **custom_coeffs)
+                    if _coeffs_applied(candidate):
+                        algorithm = candidate
                 except TypeError:
-                    algorithm = GNNExplainer(epochs=gnn_epochs, lr=gnn_lr, **gnn_coeffs)
+                    pass
+
+                if algorithm is None:
+                    # Robust fallback: instantiate default and patch coeff dict in-place.
+                    candidate = GNNExplainer(epochs=gnn_epochs, lr=gnn_lr)
+                    algo_coeffs = getattr(candidate, "coeffs", None)
+                    if isinstance(algo_coeffs, dict):
+                        algo_coeffs.update(custom_coeffs)
+                    if not _coeffs_applied(candidate):
+                        raise TypeError(
+                            "Could not apply custom GNNExplainer coeffs. "
+                            "Check torch_geometric version and coeff names."
+                        )
+                    algorithm = candidate
             else:
                 algorithm = GNNExplainer(epochs=gnn_epochs, lr=gnn_lr)
 

@@ -40,6 +40,38 @@ from scripts.explainer.ig_explainer import compute_ig_explanation
 EXP_METHOD_GNN = "gnnexplainer"
 EXP_METHOD_IG = "integrated_gradients"
 EXP_ALLOWED_NODE_TYPES = ("H", "C", "Others")
+EXP_PLOT_METHOD_COLORS = {
+    EXP_METHOD_GNN: "#004e9f",
+    EXP_METHOD_IG: "#fcba00",
+}
+EXP_PLOT_NEUTRAL_COLOR = "#909085"
+
+
+def exp_pretty_method_name(method: str) -> str:
+    method_norm = str(method).strip().lower()
+    if method_norm == EXP_METHOD_GNN:
+        return "GNNExplainer"
+    if method_norm == EXP_METHOD_IG:
+        return "Integrated Gradients"
+    return method_norm.replace("_", " ").title()
+
+
+def exp_pretty_metric_name(metric: str) -> str:
+    metric_norm = str(metric).strip().lower()
+    if metric_norm == "fid_plus_model":
+        return "Fidelity+"
+    if metric_norm == "fid_minus_model":
+        return "Fidelity-"
+    return metric_norm.replace("_", " ").title()
+
+
+def exp_pretty_mask_name(mask_variant: str) -> str:
+    mask_norm = str(mask_variant).strip().lower()
+    if mask_norm == "zero":
+        return "Zero Mask"
+    if mask_norm == "scientific":
+        return "Scientific Mask"
+    return mask_norm.replace("_", " ").title()
 
 
 @dataclass
@@ -891,10 +923,14 @@ def plot_fidelity_vs_sparsity(
     metric: str,
     output_path: Path,
     title: str,
+    node_type: Optional[str] = None,
+    color_map: Optional[Dict[str, str]] = None,
+    neutral_color: str = EXP_PLOT_NEUTRAL_COLOR,
 ) -> Path:
     if metric not in {"fid_plus_model", "fid_minus_model"}:
         raise ValueError("metric must be one of: fid_plus_model | fid_minus_model")
     mean_col = f"{metric}_mean"
+    metric_label = exp_pretty_metric_name(metric)
     import matplotlib.pyplot as plt
 
     def _save_placeholder(message: str) -> None:
@@ -910,8 +946,8 @@ def plot_fidelity_vs_sparsity(
         )
         ax.set_title(title)
         ax.set_xlabel("Sparsity")
-        ax.set_ylabel(f"{metric} (mean)")
-        ax.grid(True, alpha=0.25)
+        ax.set_ylabel(f"{metric_label} (Mean)")
+        ax.grid(True, alpha=0.25, color=neutral_color)
         fig.tight_layout()
         fig.savefig(output_path, dpi=160)
         plt.close(fig)
@@ -924,16 +960,33 @@ def plot_fidelity_vs_sparsity(
         return output_path
 
     plot_df = summary_df[summary_df["mask_variant"] == str(mask_variant)].copy()
+    if node_type is not None and "node_type" in plot_df.columns:
+        plot_df = plot_df[plot_df["node_type"] == str(node_type)].copy()
     if plot_df.empty:
-        _save_placeholder(f"No rows for mask_variant='{mask_variant}'.")
+        if node_type is None:
+            _save_placeholder(f"No rows for mask variant '{mask_variant}'.")
+        else:
+            _save_placeholder(
+                f"No rows for mask variant '{mask_variant}' and node type '{node_type}'."
+            )
         return output_path
 
+    method_colors = color_map if color_map is not None else EXP_PLOT_METHOD_COLORS
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8.0, 5.0))
 
     plotted = False
-    grouped = plot_df.groupby(["method", "node_type"], dropna=False)
-    for (method, node_type), group_df in grouped:
+    if node_type is None and "node_type" in plot_df.columns:
+        grouped = plot_df.groupby(["method", "node_type"], dropna=False)
+    else:
+        grouped = plot_df.groupby(["method"], dropna=False)
+    for group_keys, group_df in grouped:
+        if isinstance(group_keys, tuple):
+            method = str(group_keys[0])
+            group_node_type = str(group_keys[1]) if len(group_keys) > 1 else ""
+        else:
+            method = str(group_keys)
+            group_node_type = str(node_type) if node_type is not None else ""
         x = pd.to_numeric(group_df["sparsity_target"], errors="coerce").to_numpy(dtype=float)
         y = pd.to_numeric(group_df[mean_col], errors="coerce").to_numpy(dtype=float)
         finite = np.isfinite(x) & np.isfinite(y)
@@ -942,12 +995,20 @@ def plot_fidelity_vs_sparsity(
         order = np.argsort(x[finite])
         x_plot = x[finite][order]
         y_plot = y[finite][order]
+        method_label = exp_pretty_method_name(method)
+        if node_type is None and group_node_type:
+            series_label = f"{method_label} ({group_node_type})"
+        else:
+            series_label = method_label
         ax.plot(
             x_plot,
             y_plot,
             marker="o",
             linewidth=1.8,
-            label=f"{method} | {node_type}",
+            color=method_colors.get(method, neutral_color),
+            markerfacecolor=method_colors.get(method, neutral_color),
+            markeredgecolor=neutral_color,
+            label=series_label,
         )
         plotted = True
 
@@ -962,11 +1023,11 @@ def plot_fidelity_vs_sparsity(
         )
 
     ax.set_xlabel("Sparsity")
-    ax.set_ylabel(f"{metric} (mean)")
+    ax.set_ylabel(f"{metric_label} (Mean)")
     ax.set_title(title)
-    ax.grid(True, alpha=0.25)
+    ax.grid(True, alpha=0.25, color=neutral_color)
     if plotted:
-        ax.legend(loc="best")
+        ax.legend(loc="best", title="Explainer")
     fig.tight_layout()
     fig.savefig(output_path, dpi=160)
     plt.close(fig)
@@ -1870,75 +1931,73 @@ def run_fidelity_grid_evaluation(
     edge_plot_input_df.to_csv(final_edge_plot_input_csv, index=False)
     run_status_df.to_csv(final_status_csv, index=False)
 
-    plot_paths = {
-        "fid_plus_zero": str(plots_dir / "fid_plus_zero.png"),
-        "fid_minus_zero": str(plots_dir / "fid_minus_zero.png"),
-        "fid_plus_scientific": str(plots_dir / "fid_plus_scientific.png"),
-        "fid_minus_scientific": str(plots_dir / "fid_minus_scientific.png"),
-        "gnn_edge_fid_plus_zero": str(plots_dir / "gnn_edge_fid_plus_zero.png"),
-        "gnn_edge_fid_minus_zero": str(plots_dir / "gnn_edge_fid_minus_zero.png"),
-        "gnn_edge_fid_plus_scientific": str(plots_dir / "gnn_edge_fid_plus_scientific.png"),
-        "gnn_edge_fid_minus_scientific": str(plots_dir / "gnn_edge_fid_minus_scientific.png"),
-    }
-    plot_fidelity_vs_sparsity(
-        summary_df=combined_summary_df,
-        mask_variant="zero",
-        metric="fid_plus_model",
-        output_path=Path(plot_paths["fid_plus_zero"]),
-        title="Fidelity+ vs Sparsity (zero mask baseline)",
-    )
-    plot_fidelity_vs_sparsity(
-        summary_df=combined_summary_df,
-        mask_variant="zero",
-        metric="fid_minus_model",
-        output_path=Path(plot_paths["fid_minus_zero"]),
-        title="Fidelity- vs Sparsity (zero mask baseline)",
-    )
-    plot_fidelity_vs_sparsity(
-        summary_df=combined_summary_df,
-        mask_variant="scientific",
-        metric="fid_plus_model",
-        output_path=Path(plot_paths["fid_plus_scientific"]),
-        title="Fidelity+ vs Sparsity (scientific mask baseline)",
-    )
-    plot_fidelity_vs_sparsity(
-        summary_df=combined_summary_df,
-        mask_variant="scientific",
-        metric="fid_minus_model",
-        output_path=Path(plot_paths["fid_minus_scientific"]),
-        title="Fidelity- vs Sparsity (scientific mask baseline)",
-    )
+    def _metric_key(metric_name: str) -> str:
+        return "fid_plus" if metric_name == "fid_plus_model" else "fid_minus"
+
+    plot_node_types: List[str] = []
+    seen_node_types: Set[str] = set()
+    for raw_nt in node_types:
+        nt = str(raw_nt).strip()
+        if not nt or nt in seen_node_types:
+            continue
+        seen_node_types.add(nt)
+        plot_node_types.append(nt)
+    if not plot_node_types:
+        plot_node_types = ["H", "C"]
+
+    plot_paths: Dict[str, str] = {}
+    plot_masks = ("zero", "scientific")
+    plot_metrics = ("fid_plus_model", "fid_minus_model")
+
+    for mask_variant_name in plot_masks:
+        mask_label = exp_pretty_mask_name(mask_variant_name)
+        for metric_name in plot_metrics:
+            metric_key = _metric_key(metric_name)
+            metric_label = exp_pretty_metric_name(metric_name)
+            for node_type_name in plot_node_types:
+                key = f"{metric_key}_{mask_variant_name}_{node_type_name}"
+                output_path = plots_dir / f"{key}.png"
+                plot_paths[key] = str(output_path)
+                title = (
+                    f"{metric_label} vs Sparsity ({mask_label}) - Node Type {node_type_name}"
+                )
+                plot_fidelity_vs_sparsity(
+                    summary_df=combined_summary_df,
+                    mask_variant=mask_variant_name,
+                    metric=metric_name,
+                    output_path=output_path,
+                    title=title,
+                    node_type=node_type_name,
+                    color_map=EXP_PLOT_METHOD_COLORS,
+                    neutral_color=EXP_PLOT_NEUTRAL_COLOR,
+                )
+
     edge_plot_df = combined_edge_summary_df.copy()
     if "method" in edge_plot_df.columns:
         edge_plot_df = edge_plot_df[edge_plot_df["method"] == EXP_METHOD_GNN].copy()
-    plot_fidelity_vs_sparsity(
-        summary_df=edge_plot_df,
-        mask_variant="zero",
-        metric="fid_plus_model",
-        output_path=Path(plot_paths["gnn_edge_fid_plus_zero"]),
-        title="GNNExplainer edge fidelity+ vs Sparsity (zero mask baseline)",
-    )
-    plot_fidelity_vs_sparsity(
-        summary_df=edge_plot_df,
-        mask_variant="zero",
-        metric="fid_minus_model",
-        output_path=Path(plot_paths["gnn_edge_fid_minus_zero"]),
-        title="GNNExplainer edge fidelity- vs Sparsity (zero mask baseline)",
-    )
-    plot_fidelity_vs_sparsity(
-        summary_df=edge_plot_df,
-        mask_variant="scientific",
-        metric="fid_plus_model",
-        output_path=Path(plot_paths["gnn_edge_fid_plus_scientific"]),
-        title="GNNExplainer edge fidelity+ vs Sparsity (scientific mask baseline)",
-    )
-    plot_fidelity_vs_sparsity(
-        summary_df=edge_plot_df,
-        mask_variant="scientific",
-        metric="fid_minus_model",
-        output_path=Path(plot_paths["gnn_edge_fid_minus_scientific"]),
-        title="GNNExplainer edge fidelity- vs Sparsity (scientific mask baseline)",
-    )
+    for mask_variant_name in plot_masks:
+        mask_label = exp_pretty_mask_name(mask_variant_name)
+        for metric_name in plot_metrics:
+            metric_key = _metric_key(metric_name)
+            metric_label = exp_pretty_metric_name(metric_name)
+            for node_type_name in plot_node_types:
+                key = f"gnn_edge_{metric_key}_{mask_variant_name}_{node_type_name}"
+                output_path = plots_dir / f"{key}.png"
+                plot_paths[key] = str(output_path)
+                title = (
+                    f"GNNExplainer Edge {metric_label} vs Sparsity "
+                    f"({mask_label}) - Node Type {node_type_name}"
+                )
+                plot_fidelity_vs_sparsity(
+                    summary_df=edge_plot_df,
+                    mask_variant=mask_variant_name,
+                    metric=metric_name,
+                    output_path=output_path,
+                    title=title,
+                    node_type=node_type_name,
+                    color_map=EXP_PLOT_METHOD_COLORS,
+                    neutral_color=EXP_PLOT_NEUTRAL_COLOR,
+                )
 
     final_manifest = {
         "timestamp": run_stamp,
@@ -2083,16 +2142,24 @@ def run_fidelity_grid_smoke_test(
     if missing_files:
         raise RuntimeError(f"Smoke test failed. Missing artifact files: {missing_files}")
 
-    required_plots = [
-        "fid_plus_zero",
-        "fid_minus_zero",
-        "fid_plus_scientific",
-        "fid_minus_scientific",
-        "gnn_edge_fid_plus_zero",
-        "gnn_edge_fid_minus_zero",
-        "gnn_edge_fid_plus_scientific",
-        "gnn_edge_fid_minus_scientific",
-    ]
+    plot_node_types: List[str] = []
+    seen_node_types: Set[str] = set()
+    for raw_nt in node_types:
+        nt = str(raw_nt).strip()
+        if not nt or nt in seen_node_types:
+            continue
+        seen_node_types.add(nt)
+        plot_node_types.append(nt)
+    if not plot_node_types:
+        plot_node_types = ["H", "C"]
+
+    required_plots: List[str] = []
+    for node_type_name in plot_node_types:
+        for mask_variant_name in ("zero", "scientific"):
+            required_plots.append(f"fid_plus_{mask_variant_name}_{node_type_name}")
+            required_plots.append(f"fid_minus_{mask_variant_name}_{node_type_name}")
+            required_plots.append(f"gnn_edge_fid_plus_{mask_variant_name}_{node_type_name}")
+            required_plots.append(f"gnn_edge_fid_minus_{mask_variant_name}_{node_type_name}")
     missing_plots: List[str] = []
     for key in required_plots:
         plot_path = Path(str(result.get("plot_paths", {}).get(key, "")))

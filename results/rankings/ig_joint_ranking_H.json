@@ -1,0 +1,794 @@
+[
+  {
+    "feature_key": "H:orb_charge_loew_p",
+    "node_type": "H",
+    "feature_name": "orb_charge_loew_p",
+    "score": 0.024320740543771535,
+    "idx": 29,
+    "global_share": 0.17105887969247177,
+    "rank": 1
+  },
+  {
+    "feature_key": "H:shielding_para",
+    "node_type": "H",
+    "feature_name": "shielding_para",
+    "score": 0.01729342876933515,
+    "idx": 19,
+    "global_share": 0.12163258540585911,
+    "rank": 2
+  },
+  {
+    "feature_key": "H:shift_low",
+    "node_type": "H",
+    "feature_name": "shift_low",
+    "score": 0.015288616705220193,
+    "idx": 16,
+    "global_share": 0.10753182621786297,
+    "rank": 3
+  },
+  {
+    "feature_key": "H:at_charge_loew",
+    "node_type": "H",
+    "feature_name": "at_charge_loew",
+    "score": 0.008490326959872618,
+    "idx": 25,
+    "global_share": 0.059716348495421984,
+    "rank": 4
+  },
+  {
+    "feature_key": "H:at_charge_mull",
+    "node_type": "H",
+    "feature_name": "at_charge_mull",
+    "score": 0.008007590076886117,
+    "idx": 24,
+    "global_share": 0.05632103944875506,
+    "rank": 5
+  },
+  {
+    "feature_key": "H:anisotropy",
+    "node_type": "H",
+    "feature_name": "anisotropy",
+    "score": 0.0059539194626268,
+    "idx": 23,
+    "global_share": 0.04187663575552477,
+    "rank": 6
+  },
+  {
+    "feature_key": "H:CN(X)",
+    "node_type": "H",
+    "feature_name": "CN(X)",
+    "score": 0.0044979575905017555,
+    "idx": 17,
+    "global_share": 0.03163619072168939,
+    "rank": 7
+  },
+  {
+    "feature_key": "H:orb_charge_loew_s",
+    "node_type": "H",
+    "feature_name": "orb_charge_loew_s",
+    "score": 0.00440722029452445,
+    "idx": 28,
+    "global_share": 0.030997993863815458,
+    "rank": 8
+  },
+  {
+    "feature_key": "H:asymmetry",
+    "node_type": "H",
+    "feature_name": "asymmetry",
+    "score": 0.004044083820190281,
+    "idx": 22,
+    "global_share": 0.028443889133193463,
+    "rank": 9
+  },
+  {
+    "feature_key": "C:shift_low",
+    "node_type": "C",
+    "feature_name": "shift_low",
+    "score": 0.003721129847690463,
+    "idx": 16,
+    "global_share": 0.026172406296203946,
+    "rank": 10
+  },
+  {
+    "feature_key": "C:shielding_para",
+    "node_type": "C",
+    "feature_name": "shielding_para",
+    "score": 0.0034853836987167597,
+    "idx": 19,
+    "global_share": 0.024514295924824497,
+    "rank": 11
+  },
+  {
+    "feature_key": "C:shielding_dia",
+    "node_type": "C",
+    "feature_name": "shielding_dia",
+    "score": 0.0031973766162991524,
+    "idx": 18,
+    "global_share": 0.02248861053201395,
+    "rank": 12
+  },
+  {
+    "feature_key": "H:span",
+    "node_type": "H",
+    "feature_name": "span",
+    "score": 0.0030230286647565663,
+    "idx": 20,
+    "global_share": 0.021262341734241262,
+    "rank": 13
+  },
+  {
+    "feature_key": "H:skew",
+    "node_type": "H",
+    "feature_name": "skew",
+    "score": 0.002957950928248465,
+    "idx": 21,
+    "global_share": 0.020804620281230302,
+    "rank": 14
+  },
+  {
+    "feature_key": "H:mayer_VA",
+    "node_type": "H",
+    "feature_name": "mayer_VA",
+    "score": 0.0029524449237214867,
+    "idx": 32,
+    "global_share": 0.02076589403585667,
+    "rank": 15
+  },
+  {
+    "feature_key": "H:shielding_dia",
+    "node_type": "H",
+    "feature_name": "shielding_dia",
+    "score": 0.002864692396542523,
+    "idx": 18,
+    "global_share": 0.020148690420596648,
+    "rank": 16
+  },
+  {
+    "feature_key": "C:orb_charge_mull_s",
+    "node_type": "C",
+    "feature_name": "orb_charge_mull_s",
+    "score": 0.0023624913301318884,
+    "idx": 26,
+    "global_share": 0.016616480879281182,
+    "rank": 17
+  },
+  {
+    "feature_key": "H:BO_loew",
+    "node_type": "H",
+    "feature_name": "BO_loew",
+    "score": 0.0020018261202494614,
+    "idx": 30,
+    "global_share": 0.01407975768059807,
+    "rank": 18
+  },
+  {
+    "feature_key": "H:orb_charge_mull_p",
+    "node_type": "H",
+    "feature_name": "orb_charge_mull_p",
+    "score": 0.0017215443367604166,
+    "idx": 27,
+    "global_share": 0.012108407844619395,
+    "rank": 19
+  },
+  {
+    "feature_key": "C:orb_charge_loew_s",
+    "node_type": "C",
+    "feature_name": "orb_charge_loew_s",
+    "score": 0.0016421970212832093,
+    "idx": 30,
+    "global_share": 0.011550321923357748,
+    "rank": 20
+  },
+  {
+    "feature_key": "H:orb_charge_mull_s",
+    "node_type": "H",
+    "feature_name": "orb_charge_mull_s",
+    "score": 0.0014296497465693392,
+    "idx": 26,
+    "global_share": 0.010055379833547335,
+    "rank": 21
+  },
+  {
+    "feature_key": "C:orb_stdev_mull_p",
+    "node_type": "C",
+    "feature_name": "orb_stdev_mull_p",
+    "score": 0.0011543110013008118,
+    "idx": 29,
+    "global_share": 0.008118796643705812,
+    "rank": 22
+  },
+  {
+    "feature_key": "C:CN(X)",
+    "node_type": "C",
+    "feature_name": "CN(X)",
+    "score": 0.0011446649441495538,
+    "idx": 17,
+    "global_share": 0.008050951516754432,
+    "rank": 23
+  },
+  {
+    "feature_key": "C:asymmetry",
+    "node_type": "C",
+    "feature_name": "asymmetry",
+    "score": 0.0011445131385698915,
+    "idx": 22,
+    "global_share": 0.008049883798757054,
+    "rank": 24
+  },
+  {
+    "feature_key": "C:orb_charge_mull_d",
+    "node_type": "C",
+    "feature_name": "orb_charge_mull_d",
+    "score": 0.0011341465869918466,
+    "idx": 28,
+    "global_share": 0.007976971105328865,
+    "rank": 25
+  },
+  {
+    "feature_key": "C:span",
+    "node_type": "C",
+    "feature_name": "span",
+    "score": 0.001126810908317566,
+    "idx": 20,
+    "global_share": 0.007925375925751663,
+    "rank": 26
+  },
+  {
+    "feature_key": "C:at_charge_loew",
+    "node_type": "C",
+    "feature_name": "at_charge_loew",
+    "score": 0.001122692716307938,
+    "idx": 25,
+    "global_share": 0.00789641079986425,
+    "rank": 27
+  },
+  {
+    "feature_key": "C:anisotropy",
+    "node_type": "C",
+    "feature_name": "anisotropy",
+    "score": 0.0010435042204335332,
+    "idx": 23,
+    "global_share": 0.007339441929429232,
+    "rank": 28
+  },
+  {
+    "feature_key": "C:mayer_VA",
+    "node_type": "C",
+    "feature_name": "mayer_VA",
+    "score": 0.0009500893065705895,
+    "idx": 38,
+    "global_share": 0.006682412161638868,
+    "rank": 29
+  },
+  {
+    "feature_key": "C:orb_charge_mull_p",
+    "node_type": "C",
+    "feature_name": "orb_charge_mull_p",
+    "score": 0.0009396115783601999,
+    "idx": 27,
+    "global_share": 0.006608717512161986,
+    "rank": 30
+  },
+  {
+    "feature_key": "C:at_charge_mull",
+    "node_type": "C",
+    "feature_name": "at_charge_mull",
+    "score": 0.0008935669902712107,
+    "idx": 24,
+    "global_share": 0.006284864887681727,
+    "rank": 31
+  },
+  {
+    "feature_key": "C:BO_mayer_sum",
+    "node_type": "C",
+    "feature_name": "BO_mayer_sum",
+    "score": 0.0008898052619770169,
+    "idx": 36,
+    "global_share": 0.006258406933963001,
+    "rank": 32
+  },
+  {
+    "feature_key": "C:orb_stdev_loew_p",
+    "node_type": "C",
+    "feature_name": "orb_stdev_loew_p",
+    "score": 0.0008704962092451751,
+    "idx": 33,
+    "global_share": 0.006122597544348111,
+    "rank": 33
+  },
+  {
+    "feature_key": "C:orb_charge_loew_d",
+    "node_type": "C",
+    "feature_name": "orb_charge_loew_d",
+    "score": 0.000864582892972976,
+    "idx": 32,
+    "global_share": 0.006081006489381296,
+    "rank": 34
+  },
+  {
+    "feature_key": "H:BO_mayer",
+    "node_type": "H",
+    "feature_name": "BO_mayer",
+    "score": 0.0007940809555293527,
+    "idx": 31,
+    "global_share": 0.005585134153029126,
+    "rank": 35
+  },
+  {
+    "feature_key": "C:orb_charge_loew_p",
+    "node_type": "C",
+    "feature_name": "orb_charge_loew_p",
+    "score": 0.0006894132238812745,
+    "idx": 31,
+    "global_share": 0.004848958176666524,
+    "rank": 36
+  },
+  {
+    "feature_key": "C:skew",
+    "node_type": "C",
+    "feature_name": "skew",
+    "score": 0.0006571935373358428,
+    "idx": 21,
+    "global_share": 0.004622342400942721,
+    "rank": 37
+  },
+  {
+    "feature_key": "C:degree",
+    "node_type": "C",
+    "feature_name": "degree",
+    "score": 0.0006354098441079259,
+    "idx": 15,
+    "global_share": 0.004469127734126737,
+    "rank": 38
+  },
+  {
+    "feature_key": "C:BO_loew_sum",
+    "node_type": "C",
+    "feature_name": "BO_loew_sum",
+    "score": 0.0006116625154390931,
+    "idx": 34,
+    "global_share": 0.004302101922126132,
+    "rank": 39
+  },
+  {
+    "feature_key": "Others:degree",
+    "node_type": "Others",
+    "feature_name": "degree",
+    "score": 0.0006086605717428029,
+    "idx": 15,
+    "global_share": 0.004280987880608231,
+    "rank": 40
+  },
+  {
+    "feature_key": "C:BO_mayer_av",
+    "node_type": "C",
+    "feature_name": "BO_mayer_av",
+    "score": 0.000502261274959892,
+    "idx": 37,
+    "global_share": 0.0035326330155499536,
+    "rank": 41
+  },
+  {
+    "feature_key": "C:BO_loew_av",
+    "node_type": "C",
+    "feature_name": "BO_loew_av",
+    "score": 0.0004943172098137438,
+    "idx": 35,
+    "global_share": 0.003476758775961795,
+    "rank": 42
+  },
+  {
+    "feature_key": "Others:formal_charge",
+    "node_type": "Others",
+    "feature_name": "formal_charge",
+    "score": 0.00014702067710459232,
+    "idx": 14,
+    "global_share": 0.0010340635916031276,
+    "rank": 43
+  },
+  {
+    "feature_key": "Others:mass",
+    "node_type": "Others",
+    "feature_name": "mass",
+    "score": 9.518206934444606e-05,
+    "idx": 13,
+    "global_share": 0.0006694589796543759,
+    "rank": 44
+  },
+  {
+    "feature_key": "H:H",
+    "node_type": "H",
+    "feature_name": "H",
+    "score": 0.0,
+    "idx": 0,
+    "global_share": 0.0,
+    "rank": 45
+  },
+  {
+    "feature_key": "H:C",
+    "node_type": "H",
+    "feature_name": "C",
+    "score": 0.0,
+    "idx": 1,
+    "global_share": 0.0,
+    "rank": 46
+  },
+  {
+    "feature_key": "H:Li",
+    "node_type": "H",
+    "feature_name": "Li",
+    "score": 0.0,
+    "idx": 2,
+    "global_share": 0.0,
+    "rank": 47
+  },
+  {
+    "feature_key": "H:B",
+    "node_type": "H",
+    "feature_name": "B",
+    "score": 0.0,
+    "idx": 3,
+    "global_share": 0.0,
+    "rank": 48
+  },
+  {
+    "feature_key": "H:N",
+    "node_type": "H",
+    "feature_name": "N",
+    "score": 0.0,
+    "idx": 4,
+    "global_share": 0.0,
+    "rank": 49
+  },
+  {
+    "feature_key": "H:O",
+    "node_type": "H",
+    "feature_name": "O",
+    "score": 0.0,
+    "idx": 5,
+    "global_share": 0.0,
+    "rank": 50
+  },
+  {
+    "feature_key": "H:Na",
+    "node_type": "H",
+    "feature_name": "Na",
+    "score": 0.0,
+    "idx": 6,
+    "global_share": 0.0,
+    "rank": 51
+  },
+  {
+    "feature_key": "H:Mg",
+    "node_type": "H",
+    "feature_name": "Mg",
+    "score": 0.0,
+    "idx": 7,
+    "global_share": 0.0,
+    "rank": 52
+  },
+  {
+    "feature_key": "H:Al",
+    "node_type": "H",
+    "feature_name": "Al",
+    "score": 0.0,
+    "idx": 8,
+    "global_share": 0.0,
+    "rank": 53
+  },
+  {
+    "feature_key": "H:Si",
+    "node_type": "H",
+    "feature_name": "Si",
+    "score": 0.0,
+    "idx": 9,
+    "global_share": 0.0,
+    "rank": 54
+  },
+  {
+    "feature_key": "H:P",
+    "node_type": "H",
+    "feature_name": "P",
+    "score": 0.0,
+    "idx": 10,
+    "global_share": 0.0,
+    "rank": 55
+  },
+  {
+    "feature_key": "H:S",
+    "node_type": "H",
+    "feature_name": "S",
+    "score": 0.0,
+    "idx": 11,
+    "global_share": 0.0,
+    "rank": 56
+  },
+  {
+    "feature_key": "H:Cl",
+    "node_type": "H",
+    "feature_name": "Cl",
+    "score": 0.0,
+    "idx": 12,
+    "global_share": 0.0,
+    "rank": 57
+  },
+  {
+    "feature_key": "H:mass",
+    "node_type": "H",
+    "feature_name": "mass",
+    "score": 0.0,
+    "idx": 13,
+    "global_share": 0.0,
+    "rank": 58
+  },
+  {
+    "feature_key": "H:formal_charge",
+    "node_type": "H",
+    "feature_name": "formal_charge",
+    "score": 0.0,
+    "idx": 14,
+    "global_share": 0.0,
+    "rank": 59
+  },
+  {
+    "feature_key": "H:degree",
+    "node_type": "H",
+    "feature_name": "degree",
+    "score": 0.0,
+    "idx": 15,
+    "global_share": 0.0,
+    "rank": 60
+  },
+  {
+    "feature_key": "C:H",
+    "node_type": "C",
+    "feature_name": "H",
+    "score": 0.0,
+    "idx": 0,
+    "global_share": 0.0,
+    "rank": 61
+  },
+  {
+    "feature_key": "C:C",
+    "node_type": "C",
+    "feature_name": "C",
+    "score": 0.0,
+    "idx": 1,
+    "global_share": 0.0,
+    "rank": 62
+  },
+  {
+    "feature_key": "C:Li",
+    "node_type": "C",
+    "feature_name": "Li",
+    "score": 0.0,
+    "idx": 2,
+    "global_share": 0.0,
+    "rank": 63
+  },
+  {
+    "feature_key": "C:B",
+    "node_type": "C",
+    "feature_name": "B",
+    "score": 0.0,
+    "idx": 3,
+    "global_share": 0.0,
+    "rank": 64
+  },
+  {
+    "feature_key": "C:N",
+    "node_type": "C",
+    "feature_name": "N",
+    "score": 0.0,
+    "idx": 4,
+    "global_share": 0.0,
+    "rank": 65
+  },
+  {
+    "feature_key": "C:O",
+    "node_type": "C",
+    "feature_name": "O",
+    "score": 0.0,
+    "idx": 5,
+    "global_share": 0.0,
+    "rank": 66
+  },
+  {
+    "feature_key": "C:Na",
+    "node_type": "C",
+    "feature_name": "Na",
+    "score": 0.0,
+    "idx": 6,
+    "global_share": 0.0,
+    "rank": 67
+  },
+  {
+    "feature_key": "C:Mg",
+    "node_type": "C",
+    "feature_name": "Mg",
+    "score": 0.0,
+    "idx": 7,
+    "global_share": 0.0,
+    "rank": 68
+  },
+  {
+    "feature_key": "C:Al",
+    "node_type": "C",
+    "feature_name": "Al",
+    "score": 0.0,
+    "idx": 8,
+    "global_share": 0.0,
+    "rank": 69
+  },
+  {
+    "feature_key": "C:Si",
+    "node_type": "C",
+    "feature_name": "Si",
+    "score": 0.0,
+    "idx": 9,
+    "global_share": 0.0,
+    "rank": 70
+  },
+  {
+    "feature_key": "C:P",
+    "node_type": "C",
+    "feature_name": "P",
+    "score": 0.0,
+    "idx": 10,
+    "global_share": 0.0,
+    "rank": 71
+  },
+  {
+    "feature_key": "C:S",
+    "node_type": "C",
+    "feature_name": "S",
+    "score": 0.0,
+    "idx": 11,
+    "global_share": 0.0,
+    "rank": 72
+  },
+  {
+    "feature_key": "C:Cl",
+    "node_type": "C",
+    "feature_name": "Cl",
+    "score": 0.0,
+    "idx": 12,
+    "global_share": 0.0,
+    "rank": 73
+  },
+  {
+    "feature_key": "C:mass",
+    "node_type": "C",
+    "feature_name": "mass",
+    "score": 0.0,
+    "idx": 13,
+    "global_share": 0.0,
+    "rank": 74
+  },
+  {
+    "feature_key": "C:formal_charge",
+    "node_type": "C",
+    "feature_name": "formal_charge",
+    "score": 0.0,
+    "idx": 14,
+    "global_share": 0.0,
+    "rank": 75
+  },
+  {
+    "feature_key": "Others:H",
+    "node_type": "Others",
+    "feature_name": "H",
+    "score": 0.0,
+    "idx": 0,
+    "global_share": 0.0,
+    "rank": 76
+  },
+  {
+    "feature_key": "Others:C",
+    "node_type": "Others",
+    "feature_name": "C",
+    "score": 0.0,
+    "idx": 1,
+    "global_share": 0.0,
+    "rank": 77
+  },
+  {
+    "feature_key": "Others:Li",
+    "node_type": "Others",
+    "feature_name": "Li",
+    "score": 0.0,
+    "idx": 2,
+    "global_share": 0.0,
+    "rank": 78
+  },
+  {
+    "feature_key": "Others:B",
+    "node_type": "Others",
+    "feature_name": "B",
+    "score": 0.0,
+    "idx": 3,
+    "global_share": 0.0,
+    "rank": 79
+  },
+  {
+    "feature_key": "Others:N",
+    "node_type": "Others",
+    "feature_name": "N",
+    "score": 0.0,
+    "idx": 4,
+    "global_share": 0.0,
+    "rank": 80
+  },
+  {
+    "feature_key": "Others:O",
+    "node_type": "Others",
+    "feature_name": "O",
+    "score": 0.0,
+    "idx": 5,
+    "global_share": 0.0,
+    "rank": 81
+  },
+  {
+    "feature_key": "Others:Na",
+    "node_type": "Others",
+    "feature_name": "Na",
+    "score": 0.0,
+    "idx": 6,
+    "global_share": 0.0,
+    "rank": 82
+  },
+  {
+    "feature_key": "Others:Mg",
+    "node_type": "Others",
+    "feature_name": "Mg",
+    "score": 0.0,
+    "idx": 7,
+    "global_share": 0.0,
+    "rank": 83
+  },
+  {
+    "feature_key": "Others:Al",
+    "node_type": "Others",
+    "feature_name": "Al",
+    "score": 0.0,
+    "idx": 8,
+    "global_share": 0.0,
+    "rank": 84
+  },
+  {
+    "feature_key": "Others:Si",
+    "node_type": "Others",
+    "feature_name": "Si",
+    "score": 0.0,
+    "idx": 9,
+    "global_share": 0.0,
+    "rank": 85
+  },
+  {
+    "feature_key": "Others:P",
+    "node_type": "Others",
+    "feature_name": "P",
+    "score": 0.0,
+    "idx": 10,
+    "global_share": 0.0,
+    "rank": 86
+  },
+  {
+    "feature_key": "Others:S",
+    "node_type": "Others",
+    "feature_name": "S",
+    "score": 0.0,
+    "idx": 11,
+    "global_share": 0.0,
+    "rank": 87
+  },
+  {
+    "feature_key": "Others:Cl",
+    "node_type": "Others",
+    "feature_name": "Cl",
+    "score": 0.0,
+    "idx": 12,
+    "global_share": 0.0,
+    "rank": 88
+  }
+]

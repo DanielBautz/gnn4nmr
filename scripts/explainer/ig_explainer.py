@@ -4,16 +4,15 @@ Integrated Gradients (IG) Explainer for heterogeneous GNN.
 Supports:
 - Single-node IG explanations (optionally including neighbor-feature attributions).
 - Batch IG feature-importance aggregation (optionally including neighbor-feature attributions).
-- Scientific baseline (train-median based) for both target nodes and neighbors.
 
 Notes:
 - Scientific baseline medians are computed in the normalized feature space.
 - When include_neighbors=True in batch mode, results are aggregated per node type (H/C/Others),
   because feature dimensionalities differ by type.
 
-Option B (FAIR CONTEXT AGGREGATION):
-- In batch mode with include_neighbors=True, neighbor attributions are first averaged PER TARGET NODE
-  (per neighbor node type), then aggregated across target nodes. This avoids degree bias.
+Context aggregation:
+- In batch mode with include_neighbors=True, neighbor attributions are first averaged per target node
+  (per neighbor node type), then aggregated across target nodes.
 """
 
 from __future__ import annotations
@@ -108,7 +107,7 @@ def find_k_hop_neighbors(
 
 
 # ---------------------------------------------------------------------------
-# Single-node IG explanation (unchanged)
+# Single-node IG explanation
 # ---------------------------------------------------------------------------
 
 def compute_ig_explanation(
@@ -131,6 +130,7 @@ def compute_ig_explanation(
     dataset: Any = None,
     train_graph_indices: Optional[List[int]] = None,
     train_split_path: Optional[str] = None,
+    explanation_type: str = "model",
 ):
     """
     Compute IG attributions for a single node. Optionally include neighbor-feature attributions
@@ -143,6 +143,34 @@ def compute_ig_explanation(
     """
     wrapped_model = NodeTypeRegressionWrapper(base_model, node_type).to(device)
     wrapped_model.eval()
+
+    explanation_type = explanation_type.lower()
+    if explanation_type not in {"model", "phenomenon"}:
+        raise ValueError("explanation_type must be 'model' or 'phenomenon'")
+
+    phenomenon_targets: Optional[torch.Tensor]
+    target_value: Optional[torch.Tensor]
+    if explanation_type == "phenomenon":
+        if target is None:
+            raise ValueError("Phenomenon explanation requires a target tensor.")
+        flattened = target.view(target.shape[0], -1)
+        if flattened.size(1) != 1:
+            flattened = flattened.mean(dim=1, keepdim=True)
+        phenomenon_targets = flattened.squeeze(-1)
+        if phenomenon_targets.size(0) <= node_idx:
+            raise ValueError(
+                f"Target tensor for node type {node_type} is too short ({phenomenon_targets.size(0)} entries)."
+            )
+        target_value = phenomenon_targets[node_idx].clone().detach().to(device)
+    else:
+        phenomenon_targets = None
+        target_value = None
+
+    def _wrap_output(pred: torch.Tensor) -> torch.Tensor:
+        if explanation_type == "phenomenon":
+            diff = pred - target_value
+            return (diff * diff).view(1, 1)
+        return pred.view(1, 1)
 
     def forward_func(inputs):
         outputs = []
@@ -168,12 +196,12 @@ def compute_ig_explanation(
                 temp_edge_attr_dict if temp_edge_attr_dict else None,
             )
             pred = out[node_idx]
-            outputs.append(pred.view(1, 1))
+            outputs.append(_wrap_output(pred))
         return torch.cat(outputs, dim=0)  # [B, 1]
 
     target_features = x_dict[node_type][node_idx].clone().detach().to(device)
 
-    # --- build baseline for target ---
+    # Build baseline for target node features.
     if baseline_type == "zero":
         baseline = torch.zeros_like(target_features)
     elif baseline_type == "mean":
@@ -260,13 +288,11 @@ def compute_ig_explanation(
         "convergence_delta": float(delta.detach().cpu().item()) if isinstance(delta, torch.Tensor) else float(delta),
     }
 
-    # (Neighbor part unchanged from your original; omitted here for brevity)
-    # If you want, you can keep your existing include_neighbors logic as-is.
     return result
 
 
 # ---------------------------------------------------------------------------
-# Batch IG analysis (OPTION B implemented here)
+# Batch IG analysis
 # ---------------------------------------------------------------------------
 
 def batch_ig_analysis(
@@ -282,13 +308,14 @@ def batch_ig_analysis(
     include_neighbors: bool = False,
     k_hops: int = 1,
     max_neighbors_per_type: Optional[int] = 25,
+    explanation_type: str = "model",
 ):
     """
     Batch IG for target nodes of `node_type` over `graph_indices`.
 
     If include_neighbors=True:
       additionally compute IG for k-hop neighbor nodes (their features) w.r.t. target prediction,
-      BUT (Option B) neighbor attributions are first averaged PER TARGET NODE (per neighbor type),
+      neighbor attributions are first averaged per target node (per neighbor type),
       then aggregated across target nodes. This reduces degree bias.
 
     Returns (backward-compatible structure):
@@ -310,7 +337,8 @@ def batch_ig_analysis(
         if train_graph_indices is None:
             import warnings
             warnings.warn(
-                "batch_ig_analysis: scientific baseline without train_graph_indices. Using graph_indices as proxy (DEBUG).",
+                "batch_ig_analysis: scientific baseline without train_graph_indices. "
+                "Using graph_indices as fallback.",
                 UserWarning,
             )
             train_graph_indices_eff = list(graph_indices)
@@ -367,6 +395,18 @@ def batch_ig_analysis(
         data = dataset[graph_idx].to(device)
         x_dict, edge_index_dict, edge_attr_dict, y_dict = heterodata_to_dicts(data)
 
+        target_tensor = y_dict.get(node_type)
+        phenomenon_targets = None
+        if explanation_type == "phenomenon":
+            if target_tensor is None:
+                raise ValueError(
+                    f"No targets available for node type {node_type} in graph {graph_idx}; cannot explain phenomenon."
+                )
+            flattened = target_tensor.view(target_tensor.shape[0], -1)
+            if flattened.size(1) != 1:
+                flattened = flattened.mean(dim=1, keepdim=True)
+            phenomenon_targets = flattened.squeeze(-1)
+
         if node_type not in x_dict:
             continue
 
@@ -374,8 +414,20 @@ def batch_ig_analysis(
         num_nodes = node_features.size(0)
 
         for node_idx in range(num_nodes):
+            node_target_value: Optional[torch.Tensor] = None
+            if explanation_type == "phenomenon":
+                node_target_value = phenomenon_targets[node_idx]
+                if torch.isnan(node_target_value):
+                    continue
+                node_target_value = node_target_value.clone().detach().to(device)
 
-            # --- target (self) IG ---
+            # Target (self) IG.
+            def _wrap_output(pred: torch.Tensor) -> torch.Tensor:
+                if explanation_type == "phenomenon":
+                    diff = pred - node_target_value
+                    return (diff * diff).view(1, 1)
+                return pred.view(1, 1)
+
             def forward_func(inputs):
                 outs = []
                 for i in range(inputs.shape[0]):
@@ -387,7 +439,7 @@ def batch_ig_analysis(
                             tmp[node_idx] = inputs[i]
                         temp_x_dict[nt] = tmp
                     out = wrapped_model(temp_x_dict, edge_index_dict, edge_attr_dict)
-                    outs.append(out[node_idx].view(1, 1))
+                    outs.append(_wrap_output(out[node_idx]))
                 return torch.cat(outs, dim=0)
 
             target_feat = node_features[node_idx].clone().detach().to(device)
@@ -403,7 +455,7 @@ def batch_ig_analysis(
 
             self_attrs_by_type[node_type].append(target_attr)
 
-            # --- neighbor (context) IG (OPTION B) ---
+            # Neighbor (context) IG.
             if not include_neighbors:
                 continue
 
@@ -431,7 +483,7 @@ def batch_ig_analysis(
                                     tmp[neigh_idx] = inputs[j]
                                 temp_x_dict[nt] = tmp
                             out = wrapped_model(temp_x_dict, edge_index_dict, edge_attr_dict)
-                            outs.append(out[node_idx].view(1, 1))
+                            outs.append(_wrap_output(out[node_idx]))
                         return torch.cat(outs, dim=0)
 
                     neigh_feat = x_dict[neigh_type][neigh_idx].clone().detach().to(device)
@@ -454,7 +506,7 @@ def batch_ig_analysis(
 
                     ctx_this_target[neigh_type].append(neigh_attr)
 
-            # Option B: average over neighbors per target node (per neighbor type)
+            # Average over neighbors per target node (per neighbor type).
             for neigh_type, attrs_list in ctx_this_target.items():
                 if not attrs_list:
                     continue
@@ -500,14 +552,16 @@ def batch_ig_analysis(
             # same feature dimension within a node type by construction
             total_abs = s_abs + c_abs  # lambda=1
 
-        # total signed mean is less interpretable when mixing self+ctx; keep both separately but provide a "total_abs"
+        # Keep signed self mean and provide combined absolute importance.
         results[nt] = {
-            "avg_importance": self_stats["avg_importance"],            # keep self signed mean for direction
-            "avg_abs_importance": total_abs.tolist(),                  # TOTAL importance (self + context)
-            "std_importance": self_stats["std_importance"],            # std of self only (avoid mixing)
+            "avg_importance": self_stats["avg_importance"],
+            "avg_abs_importance": total_abs.tolist(),
+            "std_importance": self_stats["std_importance"],
             "node_count": int(self_stats["node_count"] + ctx_stats["node_count"]),
             "self_node_count": int(self_stats["node_count"]),
             "ctx_node_count": int(ctx_stats["node_count"]),
+            "self_avg_abs_importance": self_stats["avg_abs_importance"],
+            "ctx_avg_abs_importance": ctx_stats["avg_abs_importance"],
             "explainer_type": "ig",
             "includes_neighbors": bool(include_neighbors),
             "k_hops": int(k_hops),
@@ -537,6 +591,7 @@ def explain_node_with_ig(
     include_neighbors: bool = False,
     k_hops: int = 3,
     train_split_file: Optional[str] = None,
+    explanation_type: str = "model",
 ):
     """
     Standalone IG explanation for one node.
@@ -572,7 +627,11 @@ def explain_node_with_ig(
 
     # dataset
     dataset = build_dataset(data_path, config_obj, norm_stats=norm_stats_obj, edge_stats=edge_stats_obj)
+
     validate_indices(len(dataset), graph_idx, "graph_idx")
+    explanation_type = explanation_type.lower()
+    if explanation_type not in {"phenomenon", "model"}:
+        raise ValueError("--explanation-type must be either 'phenomenon' or 'model'.")
 
     # train split for scientific baseline
     train_graph_indices = None
@@ -599,6 +658,14 @@ def explain_node_with_ig(
 
     data = dataset[graph_idx].to(device)
     x_dict, edge_index_dict, edge_attr_dict, y_dict = heterodata_to_dicts(data)
+    target_for_explanation = None
+
+    if explanation_type == "phenomenon":
+        target_for_explanation = y_dict.get(node_type)
+        if target_for_explanation is None:
+            raise ValueError(
+                f"No targets available for node type {node_type} in graph {graph_idx}; cannot explain phenomenon."
+            )
 
     # validate node index if y exists
     if y_dict.get(node_type) is not None:
@@ -615,7 +682,7 @@ def explain_node_with_ig(
         edge_index_dict,
         edge_attr_dict,
         device,
-        target=None,
+        target=target_for_explanation,
         n_steps=n_steps,
         baseline_type=baseline_type,
         include_neighbors=include_neighbors,
@@ -626,6 +693,7 @@ def explain_node_with_ig(
         dataset=dataset,
         train_graph_indices=train_graph_indices,
         train_split_path=train_split_path_used,
+        explanation_type=explanation_type,
     )
 
     ensure_dir(output_dir)
@@ -652,6 +720,7 @@ def batch_explain_nodes_with_ig(
     include_neighbors: bool = False,
     k_hops: int = 1,
     max_neighbors_per_type: Optional[int] = 25,
+    explanation_type: str = "model",
 ):
     """
     Batch IG analysis for all nodes of a given type across multiple graphs.
@@ -659,7 +728,7 @@ def batch_explain_nodes_with_ig(
 
     Returns:
       dict: node_type -> aggregated stats dict (may include multiple keys when include_neighbors=True)
-      Uses Option B for neighbor aggregation (per target node mean).
+      Uses per-target neighbor aggregation (mean per target node).
     """
     print(f"Computing batch IG analysis for target={node_type} across graphs {graph_indices}...")
 
@@ -710,8 +779,8 @@ def batch_explain_nodes_with_ig(
         else:
             import warnings
             warnings.warn(
-                "⚠️ CRITICAL: --train-split-file NOT PROVIDED for scientific baseline!\n"
-                "Using 80% fallback (DEBUG ONLY - NOT FOR PRODUCTION EVALUATION)!",
+                "--train-split-file not provided for scientific baseline. "
+                "Using 80% fallback split.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -733,6 +802,7 @@ def batch_explain_nodes_with_ig(
         include_neighbors=include_neighbors,
         k_hops=k_hops,
         max_neighbors_per_type=max_neighbors_per_type,
+        explanation_type=explanation_type,
     )
 
     # save results
@@ -759,7 +829,7 @@ def batch_explain_nodes_with_ig(
 
 
 # ---------------------------------------------------------------------------
-# Main (unchanged; keep your existing CLI if you want)
+# Main 
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -790,6 +860,10 @@ if __name__ == "__main__":
                              "Wird bei --baseline-type scientific benoetigt. "
                              "Wenn nicht angegeben, wird 80%% der Datenmenge als Fallback genutzt (mit Warnung).")
 
+    parser.add_argument("--explanation-type", default="phenomenon",
+                        choices=["phenomenon", "model"],
+                        help="Decide whether to explain the phenomenon (targets) or the model output.")
+
     # neighbor/context options
     parser.add_argument("--include-neighbors", action="store_true",
                         help="Include k-hop neighbor feature attributions (context IG).")
@@ -807,7 +881,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.batch_mode:
-        parser.error("This script version focuses on batch mode. Use your existing single-node CLI if needed.")
+        parser.error("This script currently supports batch mode only.")
 
     if args.graph_indices is None:
         parser.error("--batch-mode erfordert --graph-indices")
@@ -827,4 +901,5 @@ if __name__ == "__main__":
         include_neighbors=args.include_neighbors,
         k_hops=args.k_hops,
         max_neighbors_per_type=args.max_neighbors_per_type,
+        explanation_type=args.explanation_type,
     )

@@ -123,6 +123,7 @@ def compute_ig_explanation(
     n_steps: int = 50,
     baseline_type: str = "zero",
     include_neighbors: bool = False,
+    include_all_nodes: bool = False,
     k_hops: int = 3,
     median_global: Optional[torch.Tensor] = None,
     median_by_element: Optional[Dict[str, torch.Tensor]] = None,
@@ -137,9 +138,9 @@ def compute_ig_explanation(
     w.r.t. the selected node prediction.
 
     Returns a dict with:
-      - node_mask_dict: {node_type: [1, F]}
-      - neighbors: list of neighbor attribution dicts (if include_neighbors=True)
-      - neighbor_stats: aggregated stats per neighbor_type (if include_neighbors=True)
+      - node_mask_dict: {node_type: [1, F]} for the selected node
+      - node_mask_full_dict: {node_type: [num_nodes, F]} for the computed scope
+      - node_mask_full_valid: {node_type: [num_nodes]} flags for computed rows
     """
     wrapped_model = NodeTypeRegressionWrapper(base_model, node_type).to(device)
     wrapped_model.eval()
@@ -172,120 +173,218 @@ def compute_ig_explanation(
             return (diff * diff).view(1, 1)
         return pred.view(1, 1)
 
-    def forward_func(inputs):
-        outputs = []
-        for i in range(inputs.shape[0]):
-            temp_x_dict = {}
-            for nt, x in x_dict.items():
-                temp_x = x.clone().detach().to(device)
-                if nt == node_type:
-                    temp_x = temp_x.clone()
-                    temp_x[node_idx] = inputs[i]
-                temp_x_dict[nt] = temp_x
+    edge_attr_input = None
+    if edge_attr_dict is not None:
+        edge_attr_input = {}
+        for etype, attrs in edge_attr_dict.items():
+            if attrs is not None:
+                edge_attr_input[etype] = attrs.to(device) if hasattr(attrs, "to") else attrs
+        if not edge_attr_input:
+            edge_attr_input = None
 
-            # ensure edge attrs on device
-            temp_edge_attr_dict = {}
-            if edge_attr_dict is not None:
-                for et, attrs in edge_attr_dict.items():
-                    if attrs is not None:
-                        temp_edge_attr_dict[et] = attrs.to(device) if hasattr(attrs, "to") else attrs
+    train_indices: Optional[List[int]] = (
+        list(train_graph_indices) if train_graph_indices is not None else None
+    )
+    median_global_by_type: Dict[str, torch.Tensor] = {}
+    median_by_element_by_type: Dict[str, Dict[str, torch.Tensor]] = {}
+    if median_global is not None and median_by_element is not None:
+        median_global_by_type[node_type] = median_global
+        median_by_element_by_type[node_type] = median_by_element
 
-            out = wrapped_model(
-                temp_x_dict,
-                edge_index_dict,
-                temp_edge_attr_dict if temp_edge_attr_dict else None,
+    def _resolve_train_indices() -> Optional[List[int]]:
+        nonlocal train_indices, train_split_path
+        if train_indices is not None:
+            return train_indices
+        split_candidates: List[Path] = []
+        if train_split_path:
+            split_candidates.append(Path(train_split_path))
+        split_candidates.append(Path("baselines") / "graph_split.pkl")
+        for cand in split_candidates:
+            if not cand or not cand.exists():
+                continue
+            with open(cand, "rb") as f:
+                split = pickle.load(f)
+            loaded = (
+                split.get("train_graph_indices")
+                or split.get("train_indices")
+                or split.get("train_graphs")
             )
-            pred = out[node_idx]
-            outputs.append(_wrap_output(pred))
-        return torch.cat(outputs, dim=0)  # [B, 1]
+            if loaded:
+                train_indices = list(loaded)
+                train_split_path = str(cand)
+                print(f"[IG] Scientific baseline: loaded {len(train_indices)} train graph indices from {cand}")
+                break
+        return train_indices
 
-    target_features = x_dict[node_type][node_idx].clone().detach().to(device)
+    def _build_baseline(features: torch.Tensor, curr_type: str) -> torch.Tensor:
+        nonlocal elem_distribution
+        if baseline_type == "zero":
+            return torch.zeros_like(features)
+        if baseline_type == "mean":
+            return torch.mean(x_dict[curr_type], dim=0)
+        if baseline_type == "random":
+            allf = x_dict[curr_type]
+            return torch.mean(allf, dim=0) + torch.std(allf, dim=0) * torch.randn_like(features)
+        if baseline_type == "min":
+            return torch.min(x_dict[curr_type], dim=0)[0]
+        if baseline_type == "max":
+            return torch.max(x_dict[curr_type], dim=0)[0]
+        if baseline_type != "scientific":
+            return torch.zeros_like(features)
 
-    # Build baseline for target node features.
-    if baseline_type == "zero":
-        baseline = torch.zeros_like(target_features)
-    elif baseline_type == "mean":
-        baseline = torch.mean(x_dict[node_type], dim=0)
-    elif baseline_type == "random":
-        allf = x_dict[node_type]
-        baseline = torch.mean(allf, dim=0) + torch.std(allf, dim=0) * torch.randn_like(target_features)
-    elif baseline_type == "min":
-        baseline = torch.min(x_dict[node_type], dim=0)[0]
-    elif baseline_type == "max":
-        baseline = torch.max(x_dict[node_type], dim=0)[0]
-    elif baseline_type == "scientific":
-        if median_global is None or median_by_element is None or elem_distribution is None:
-            try:
-                # Use provided dataset first, otherwise fall back to global
+        try:
+            if curr_type not in median_global_by_type or curr_type not in median_by_element_by_type:
                 ds = dataset if dataset is not None else globals().get("dataset", None)
+                resolved_train = _resolve_train_indices()
+                if ds is None or not resolved_train:
+                    raise AssertionError(
+                        "median_global/elem_distribution not provided and no train split/dataset available."
+                    )
+                mg, mbe = load_or_compute_medians(ds, resolved_train, curr_type)
+                median_global_by_type[curr_type] = mg
+                median_by_element_by_type[curr_type] = mbe
 
-                # Resolve train split indices
-                train_indices = train_graph_indices
-                split_candidates = []
-                if train_split_path:
-                    split_candidates.append(Path(train_split_path))
-                split_candidates.append(Path("baselines") / "graph_split.pkl")
+            if elem_distribution is None:
+                ds = dataset if dataset is not None else globals().get("dataset", None)
+                resolved_train = _resolve_train_indices()
+                if ds is None or not resolved_train:
+                    raise AssertionError(
+                        "median_global/elem_distribution not provided and no train split/dataset available."
+                    )
+                elem_distribution = load_or_compute_element_distribution(ds, resolved_train)
+        except Exception as e:
+            raise AssertionError(
+                "baseline_type='scientific' erfordert median_global und elem_distribution. "
+                "Bitte load_or_compute_medians() und load_or_compute_element_distribution() aufrufen. "
+                f"Fallback failed: {e}"
+            )
 
-                if train_indices is None:
-                    for cand in split_candidates:
-                        if cand and cand.exists():
-                            with open(cand, "rb") as f:
-                                sp = pickle.load(f)
-                            train_indices = (
-                                sp.get("train_graph_indices")
-                                or sp.get("train_indices")
-                                or sp.get("train_graphs")
-                            )
-                            if train_indices:
-                                print(f"[IG] Scientific baseline: loaded {len(train_indices)} train graph indices from {cand}")
-                                train_split_path = str(cand)
-                                break
-
-                if ds is not None and train_indices:
-                    if median_global is None or median_by_element is None:
-                        median_global, median_by_element = load_or_compute_medians(
-                            ds, train_indices, node_type
-                        )
-                    if elem_distribution is None:
-                        elem_distribution = load_or_compute_element_distribution(ds, train_indices)
-                else:
-                    raise AssertionError("median_global/elem_distribution not provided and no train split/dataset available.")
-            except Exception as e:
-                raise AssertionError(
-                    "baseline_type='scientific' erfordert median_global und elem_distribution. "
-                    "Bitte load_or_compute_medians() und load_or_compute_element_distribution() aufrufen. "
-                    f"Fallback failed: {e}"
-                )
-
-        baseline = build_scientific_baseline(
-            target_features.detach().cpu(),
-            node_type,
-            median_global.detach().cpu(),
-            median_by_element,
+        return build_scientific_baseline(
+            features.detach().cpu(),
+            curr_type,
+            median_global_by_type[curr_type].detach().cpu(),
+            median_by_element_by_type[curr_type],
             elem_distribution=elem_distribution.detach().cpu() if elem_distribution is not None else None,
         ).to(device)
+
+    def _compute_node_attribution(
+        vary_node_type: str,
+        vary_node_idx: int,
+        return_delta: bool = False,
+    ) -> Any:
+        def forward_func(inputs):
+            outputs = []
+            for i in range(inputs.shape[0]):
+                temp_x_dict = {}
+                for nt, x in x_dict.items():
+                    temp_x = x.clone().detach().to(device)
+                    if nt == vary_node_type:
+                        temp_x = temp_x.clone()
+                        temp_x[vary_node_idx] = inputs[i]
+                    temp_x_dict[nt] = temp_x
+                out = wrapped_model(temp_x_dict, edge_index_dict, edge_attr_input)
+                pred = out[node_idx]
+                outputs.append(_wrap_output(pred))
+            return torch.cat(outputs, dim=0)
+
+        node_features = x_dict[vary_node_type][vary_node_idx].clone().detach().to(device)
+        baseline = _build_baseline(node_features, vary_node_type)
+        ig = IntegratedGradients(forward_func)
+        if return_delta:
+            attrs, delta_local = ig.attribute(
+                inputs=node_features.unsqueeze(0),
+                baselines=baseline.unsqueeze(0),
+                n_steps=n_steps,
+                target=0,
+                return_convergence_delta=True,
+            )
+            return attrs.squeeze(0), delta_local
+        attrs = ig.attribute(
+            inputs=node_features.unsqueeze(0),
+            baselines=baseline.unsqueeze(0),
+            n_steps=n_steps,
+            target=0,
+        )
+        return attrs.squeeze(0), None
+
+    scope_indices: Dict[str, List[int]] = {}
+    if include_all_nodes:
+        for curr_type, feat_matrix in x_dict.items():
+            scope_indices[curr_type] = list(range(int(feat_matrix.size(0))))
     else:
-        baseline = torch.zeros_like(target_features)
+        scope_indices[node_type] = [int(node_idx)]
+        if include_neighbors:
+            neighbors_dict = find_k_hop_neighbors(edge_index_dict, node_type, node_idx, k=k_hops)
+            for neigh_type, neigh_idxs in neighbors_dict.items():
+                scope_indices.setdefault(neigh_type, [])
+                scope_indices[neigh_type].extend(int(i) for i in neigh_idxs)
+        for curr_type in list(scope_indices.keys()):
+            dedup = sorted(set(int(i) for i in scope_indices[curr_type]))
+            scope_indices[curr_type] = dedup
 
-    ig = IntegratedGradients(forward_func)
-    attributions, delta = ig.attribute(
-        inputs=target_features.unsqueeze(0),
-        baselines=baseline.unsqueeze(0),
-        n_steps=n_steps,
-        target=0,
-        return_convergence_delta=True,
+    node_mask_full_dict: Dict[str, torch.Tensor] = {}
+    node_mask_full_valid: Dict[str, torch.Tensor] = {}
+    for curr_type, feat_matrix in x_dict.items():
+        node_mask_full_dict[curr_type] = torch.zeros_like(feat_matrix.detach().cpu())
+        node_mask_full_valid[curr_type] = torch.zeros(
+            int(feat_matrix.size(0)),
+            dtype=torch.bool,
+        )
+
+    selected_attr: Optional[torch.Tensor] = None
+    selected_delta: Optional[Any] = None
+
+    for curr_type, idxs in scope_indices.items():
+        if curr_type not in x_dict:
+            continue
+        max_nodes = int(x_dict[curr_type].size(0))
+        for curr_idx in idxs:
+            if curr_idx < 0 or curr_idx >= max_nodes:
+                continue
+            with_delta = (curr_type == node_type and curr_idx == int(node_idx))
+            curr_attr, curr_delta = _compute_node_attribution(
+                vary_node_type=curr_type,
+                vary_node_idx=curr_idx,
+                return_delta=with_delta,
+            )
+            node_mask_full_dict[curr_type][curr_idx] = curr_attr.detach().cpu()
+            node_mask_full_valid[curr_type][curr_idx] = True
+            if with_delta:
+                selected_attr = curr_attr
+                selected_delta = curr_delta
+
+    if selected_attr is None:
+        selected_attr, selected_delta = _compute_node_attribution(
+            vary_node_type=node_type,
+            vary_node_idx=int(node_idx),
+            return_delta=True,
+        )
+        node_mask_full_dict[node_type][node_idx] = selected_attr.detach().cpu()
+        node_mask_full_valid[node_type][node_idx] = True
+
+    delta_value = (
+        float(selected_delta.detach().cpu().item())
+        if isinstance(selected_delta, torch.Tensor)
+        else float(selected_delta)
+        if selected_delta is not None
+        else float("nan")
     )
-
-    node_attr = attributions.squeeze(0)  # [F]
     result = {
-        "node_mask_dict": {node_type: node_attr.unsqueeze(0)},  # [1, F]
+        "node_mask_dict": {node_type: selected_attr.unsqueeze(0).detach().cpu()},
+        "node_mask_full_dict": node_mask_full_dict,
+        "node_mask_full_valid": node_mask_full_valid,
         "edge_mask_dict": {},
         "selected_node": {
             "node_type": node_type,
             "node_idx": node_idx,
-            "attributions": node_attr.detach().cpu().numpy().tolist(),
+            "attributions": selected_attr.detach().cpu().numpy().tolist(),
         },
-        "convergence_delta": float(delta.detach().cpu().item()) if isinstance(delta, torch.Tensor) else float(delta),
+        "convergence_delta": delta_value,
+        "mask_scope": {
+            "include_neighbors": bool(include_neighbors),
+            "include_all_nodes": bool(include_all_nodes),
+            "k_hops": int(k_hops),
+        },
     }
 
     return result

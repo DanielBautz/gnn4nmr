@@ -360,6 +360,30 @@ def exp_extract_gnn_feature_importance(explanation: Any, node_type: str, node_id
     return values.detach().cpu().numpy().astype(float)
 
 
+def exp_extract_gnn_global_feature_importance(explanation: Any) -> Dict[str, np.ndarray]:
+    if not hasattr(explanation, "node_mask_dict"):
+        return {}
+    node_mask_dict = getattr(explanation, "node_mask_dict", {})
+    if not isinstance(node_mask_dict, dict):
+        return {}
+
+    out: Dict[str, np.ndarray] = {}
+    for curr_type, mask in node_mask_dict.items():
+        if mask is None:
+            continue
+        arr = (
+            mask.detach().cpu().numpy().astype(float)
+            if isinstance(mask, torch.Tensor)
+            else np.asarray(mask, dtype=float)
+        )
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        if arr.ndim != 2:
+            continue
+        out[str(curr_type)] = arr
+    return out
+
+
 def exp_extract_ig_feature_importance(
     explanation_result: Dict[str, Any],
     node_type: str,
@@ -385,6 +409,62 @@ def exp_extract_ig_feature_importance(
     return values.detach().cpu().numpy().astype(float)
 
 
+def exp_extract_ig_global_feature_importance(
+    explanation_result: Dict[str, Any],
+) -> Dict[str, np.ndarray]:
+    full_mask_dict = explanation_result.get("node_mask_full_dict", {})
+    full_valid_dict = explanation_result.get("node_mask_full_valid", {})
+    out: Dict[str, np.ndarray] = {}
+
+    if isinstance(full_mask_dict, dict):
+        for node_type, mask in full_mask_dict.items():
+            if mask is None:
+                continue
+            arr = (
+                mask.detach().cpu().numpy().astype(float)
+                if isinstance(mask, torch.Tensor)
+                else np.asarray(mask, dtype=float)
+            )
+            if arr.ndim == 1:
+                arr = arr.reshape(1, -1)
+            if arr.ndim != 2:
+                continue
+
+            valid = None
+            if isinstance(full_valid_dict, dict):
+                valid_mask = full_valid_dict.get(node_type)
+                if valid_mask is not None:
+                    valid = (
+                        valid_mask.detach().cpu().numpy().astype(bool).reshape(-1)
+                        if isinstance(valid_mask, torch.Tensor)
+                        else np.asarray(valid_mask, dtype=bool).reshape(-1)
+                    )
+            if valid is not None and valid.size == arr.shape[0]:
+                if not np.any(valid):
+                    continue
+                arr = arr.copy()
+                arr[~valid] = np.nan
+            out[node_type] = arr
+
+    if out:
+        return out
+
+    # Compatibility fallback: use node_mask_dict when it already contains full matrices.
+    node_mask_dict = explanation_result.get("node_mask_dict", {})
+    if isinstance(node_mask_dict, dict):
+        for node_type, mask in node_mask_dict.items():
+            if mask is None:
+                continue
+            arr = (
+                mask.detach().cpu().numpy().astype(float)
+                if isinstance(mask, torch.Tensor)
+                else np.asarray(mask, dtype=float)
+            )
+            if arr.ndim == 2 and arr.shape[0] > 1:
+                out[node_type] = arr
+    return out
+
+
 def exp_feature_fidelity_for_node(
     base_model: torch.nn.Module,
     x_dict: Dict[str, torch.Tensor],
@@ -401,6 +481,7 @@ def exp_feature_fidelity_for_node(
     median_cache: Optional[Dict[str, Tuple[torch.Tensor, Dict[str, torch.Tensor]]]] = None,
     elem_distribution_cache: Optional[Dict[str, torch.Tensor]] = None,
     cache_dir: Optional[Path] = None,
+    importance_by_node_type: Optional[Dict[str, np.ndarray]] = None,
     pred_orig: Optional[float] = None,
     target_value: float = float("nan"),
 ) -> Dict[str, float]:
@@ -412,35 +493,91 @@ def exp_feature_fidelity_for_node(
         raise IndexError(f"Node index {node_idx} out of bounds for node type '{node_type}'.")
 
     feature_count = int(node_matrix.size(1))
-    keep_indices = exp_topk_indices_from_importance(importance, sparsity=sparsity)
-    k_keep = int(keep_indices.size)
-
-    baseline_vec = exp_build_mask_baseline(
-        mode=mask_baseline_mode,
-        ig_baseline_mode=ig_baseline_mode,
-        target_features=node_matrix[node_idx],
-        node_features=node_matrix,
-        node_type=node_type,
-        dataset=dataset,
-        train_graph_indices=train_graph_indices,
-        median_cache=median_cache,
-        elem_distribution_cache=elem_distribution_cache,
-        cache_dir=cache_dir,
-    )
-
-    selected = node_matrix[node_idx].clone()
-    drop_vec = selected.clone()
-    if k_keep > 0:
-        drop_vec[keep_indices] = baseline_vec[keep_indices]
-
-    keep_vec = baseline_vec.clone()
-    if k_keep > 0:
-        keep_vec[keep_indices] = selected[keep_indices]
-
     x_drop = {nt: feat.clone() for nt, feat in x_dict.items()}
     x_keep = {nt: feat.clone() for nt, feat in x_dict.items()}
-    x_drop[node_type][node_idx] = drop_vec
-    x_keep[node_type][node_idx] = keep_vec
+
+    mask_scope: Dict[str, Dict[int, np.ndarray]] = {}
+    if importance_by_node_type:
+        for curr_type, curr_importance in importance_by_node_type.items():
+            if curr_type not in x_dict or curr_importance is None:
+                continue
+            arr = np.asarray(curr_importance, dtype=float)
+            if arr.ndim == 1:
+                # 1D vectors are ambiguous for non-target types; keep only the safe case.
+                if curr_type == node_type:
+                    mask_scope.setdefault(curr_type, {})[int(node_idx)] = arr.reshape(-1)
+                elif int(x_dict[curr_type].size(0)) == 1:
+                    mask_scope.setdefault(curr_type, {})[0] = arr.reshape(-1)
+                continue
+            if arr.ndim != 2:
+                continue
+
+            node_limit = min(int(x_dict[curr_type].size(0)), int(arr.shape[0]))
+            for curr_idx in range(node_limit):
+                row = np.asarray(arr[curr_idx], dtype=float).reshape(-1)
+                if row.size == 0 or not np.isfinite(row).any():
+                    continue
+                mask_scope.setdefault(curr_type, {})[curr_idx] = row
+
+    # Always enforce the selected-node vector to match the current target explanation.
+    target_importance = np.asarray(importance, dtype=float).reshape(-1)
+    mask_scope.setdefault(node_type, {})[int(node_idx)] = target_importance
+
+    total_feature_count = 0
+    total_k_keep = 0
+    target_k_keep = int(exp_topk_indices_from_importance(target_importance, sparsity=sparsity).size)
+
+    for curr_type, row_map in mask_scope.items():
+        curr_matrix = x_dict[curr_type]
+        curr_feature_count = int(curr_matrix.size(1))
+        for curr_idx in sorted(row_map.keys()):
+            if curr_idx < 0 or curr_idx >= int(curr_matrix.size(0)):
+                continue
+            row_importance = np.asarray(row_map[curr_idx], dtype=float).reshape(-1)
+            if row_importance.size != curr_feature_count:
+                if curr_type == node_type and curr_idx == int(node_idx):
+                    raise ValueError(
+                        f"Importance size mismatch for {curr_type}[{curr_idx}]: "
+                        f"got {row_importance.size}, expected {curr_feature_count}."
+                    )
+                continue
+
+            keep_indices = exp_topk_indices_from_importance(row_importance, sparsity=sparsity)
+            k_keep = int(keep_indices.size)
+
+            baseline_vec = exp_build_mask_baseline(
+                mode=mask_baseline_mode,
+                ig_baseline_mode=ig_baseline_mode,
+                target_features=curr_matrix[curr_idx],
+                node_features=curr_matrix,
+                node_type=curr_type,
+                dataset=dataset,
+                train_graph_indices=train_graph_indices,
+                median_cache=median_cache,
+                elem_distribution_cache=elem_distribution_cache,
+                cache_dir=cache_dir,
+            )
+
+            selected = curr_matrix[curr_idx].clone()
+            drop_vec = selected.clone()
+            if k_keep > 0:
+                drop_vec[keep_indices] = baseline_vec[keep_indices]
+
+            keep_vec = baseline_vec.clone()
+            if k_keep > 0:
+                keep_vec[keep_indices] = selected[keep_indices]
+
+            x_drop[curr_type][curr_idx] = drop_vec
+            x_keep[curr_type][curr_idx] = keep_vec
+
+            total_feature_count += curr_feature_count
+            total_k_keep += k_keep
+            if curr_type == node_type and curr_idx == int(node_idx):
+                target_k_keep = k_keep
+
+    if total_feature_count <= 0:
+        total_feature_count = feature_count
+        total_k_keep = target_k_keep
 
     if pred_orig is None:
         pred_orig = exp_predict_single_node(
@@ -497,9 +634,11 @@ def exp_feature_fidelity_for_node(
         "fid_minus_model": float(fid_minus_model),
         "fid_plus_error_delta": float(fid_plus_error_delta),
         "fid_minus_error_delta": float(fid_minus_error_delta),
-        "n_features": feature_count,
-        "k_features": k_keep,
-        "actual_sparsity_feat": float(actual_sparsity(feature_count, k_keep)),
+        "n_features": int(total_feature_count),
+        "k_features": int(total_k_keep),
+        "actual_sparsity_feat": float(actual_sparsity(total_feature_count, total_k_keep)),
+        "n_features_target": int(feature_count),
+        "k_features_target": int(target_k_keep),
     }
 
 
@@ -552,17 +691,22 @@ def exp_gnn_edge_fidelity_for_node(
 ) -> Optional[Dict[str, float]]:
     all_edge_entries: List[Tuple[float, Tuple[str, str, str], int]] = []
 
-    for edge_type, edge_mask in edge_mask_dict.items():
-        if edge_mask is None or edge_type not in edge_index_dict:
+    for edge_type, edge_index in edge_index_dict.items():
+        num_edges = int(edge_index.size(1))
+        if num_edges <= 0:
             continue
 
-        edge_index = edge_index_dict[edge_type]
+        edge_mask = edge_mask_dict.get(edge_type) if isinstance(edge_mask_dict, dict) else None
+        mask_vals = None
+        if edge_mask is not None:
+            mask_vals = edge_mask.view(-1).detach().cpu()
 
-        mask_vals = edge_mask.view(-1).detach().cpu()
-
-        limit = min(int(mask_vals.shape[0]), int(edge_index.size(1)))
-        for pos in range(limit):
-            score_abs = float(abs(mask_vals[pos].item()))
+        for pos in range(num_edges):
+            if mask_vals is not None and pos < int(mask_vals.shape[0]):
+                score_abs = float(abs(mask_vals[pos].item()))
+            else:
+                # Missing mask entries are treated as zero-importance edges.
+                score_abs = 0.0
             all_edge_entries.append((score_abs, edge_type, int(pos)))
 
     total_edges_considered = len(all_edge_entries)
@@ -685,6 +829,150 @@ def build_summary_table(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["node_type", "method"]).reset_index(drop=True)
 
 
+def build_fidelity_grid_summary(node_df: pd.DataFrame) -> pd.DataFrame:
+    if node_df is None or node_df.empty:
+        return pd.DataFrame()
+
+    required = {"mask_variant", "sparsity_target", "method", "node_type"}
+    missing = required - set(node_df.columns)
+    if missing:
+        raise ValueError(
+            f"Grid summary requires columns {sorted(required)}, missing: {sorted(missing)}"
+        )
+
+    metric_cols = [
+        "fid_plus_model",
+        "fid_minus_model",
+        "fid_plus_error_delta",
+        "fid_minus_error_delta",
+        "actual_sparsity_feat",
+    ]
+    grouped = node_df.groupby(
+        ["mask_variant", "sparsity_target", "method", "node_type"],
+        dropna=False,
+    )
+
+    rows: List[Dict[str, Any]] = []
+    for keys, group_df in grouped:
+        mask_variant, sparsity_target, method, node_type = keys
+        row: Dict[str, Any] = {
+            "mask_variant": str(mask_variant),
+            "sparsity_target": float(sparsity_target),
+            "method": str(method),
+            "node_type": str(node_type),
+            "n_nodes": int(len(group_df)),
+            "n_graphs": int(group_df["graph_idx"].nunique()) if "graph_idx" in group_df.columns else int(0),
+        }
+        for metric in metric_cols:
+            if metric not in group_df.columns:
+                row[f"{metric}_mean"] = float("nan")
+                row[f"{metric}_std"] = float("nan")
+                row[f"{metric}_count"] = int(0)
+                continue
+            values = pd.to_numeric(group_df[metric], errors="coerce")
+            valid = values.dropna()
+            row[f"{metric}_mean"] = float(valid.mean()) if not valid.empty else float("nan")
+            row[f"{metric}_std"] = float(valid.std(ddof=0)) if not valid.empty else float("nan")
+            row[f"{metric}_count"] = int(valid.shape[0])
+        rows.append(row)
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    return out.sort_values(
+        ["mask_variant", "sparsity_target", "node_type", "method"],
+        ascending=[True, True, True, True],
+    ).reset_index(drop=True)
+
+
+def plot_fidelity_vs_sparsity(
+    summary_df: pd.DataFrame,
+    mask_variant: str,
+    metric: str,
+    output_path: Path,
+    title: str,
+) -> Path:
+    if metric not in {"fid_plus_model", "fid_minus_model"}:
+        raise ValueError("metric must be one of: fid_plus_model | fid_minus_model")
+    mean_col = f"{metric}_mean"
+    import matplotlib.pyplot as plt
+
+    def _save_placeholder(message: str) -> None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig, ax = plt.subplots(figsize=(8.0, 5.0))
+        ax.text(
+            0.5,
+            0.5,
+            message,
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        ax.set_title(title)
+        ax.set_xlabel("Sparsity")
+        ax.set_ylabel(f"{metric} (mean)")
+        ax.grid(True, alpha=0.25)
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=160)
+        plt.close(fig)
+
+    if summary_df is None or summary_df.empty:
+        _save_placeholder("No data available.")
+        return output_path
+    if mean_col not in summary_df.columns:
+        _save_placeholder(f"Missing column: {mean_col}")
+        return output_path
+
+    plot_df = summary_df[summary_df["mask_variant"] == str(mask_variant)].copy()
+    if plot_df.empty:
+        _save_placeholder(f"No rows for mask_variant='{mask_variant}'.")
+        return output_path
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(8.0, 5.0))
+
+    plotted = False
+    grouped = plot_df.groupby(["method", "node_type"], dropna=False)
+    for (method, node_type), group_df in grouped:
+        x = pd.to_numeric(group_df["sparsity_target"], errors="coerce").to_numpy(dtype=float)
+        y = pd.to_numeric(group_df[mean_col], errors="coerce").to_numpy(dtype=float)
+        finite = np.isfinite(x) & np.isfinite(y)
+        if not finite.any():
+            continue
+        order = np.argsort(x[finite])
+        x_plot = x[finite][order]
+        y_plot = y[finite][order]
+        ax.plot(
+            x_plot,
+            y_plot,
+            marker="o",
+            linewidth=1.8,
+            label=f"{method} | {node_type}",
+        )
+        plotted = True
+
+    if not plotted:
+        ax.text(
+            0.5,
+            0.5,
+            "No finite values to plot",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+
+    ax.set_xlabel("Sparsity")
+    ax.set_ylabel(f"{metric} (mean)")
+    ax.set_title(title)
+    ax.grid(True, alpha=0.25)
+    if plotted:
+        ax.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=160)
+    plt.close(fig)
+    return output_path
+
+
 def shared_node_keys(
     node_df: pd.DataFrame,
     methods: Sequence[str],
@@ -720,9 +1008,11 @@ def run_experiments_evaluation(
     gnn_epochs: int = 200,
     gnn_lr: float = 0.01,
     gnn_explanation_type: str = "phenomenon",
+    ig_explanation_type: Optional[str] = None,
     gnn_use_custom_coeffs: bool = False,
     gnn_coeffs: Optional[Dict[str, float]] = None,
     ig_n_steps: int = 64,
+    ig_scientific_strict: bool = False,
     graph_scope: str = "test_split",
     first_graph_per_component: bool = True,
     component_key: str = "compound",
@@ -737,6 +1027,16 @@ def run_experiments_evaluation(
     clean_node_types = [nt for nt in node_types if nt in EXP_ALLOWED_NODE_TYPES]
     if not clean_node_types:
         raise ValueError("No valid node types selected.")
+
+    gnn_explanation_type_norm = str(gnn_explanation_type).strip().lower()
+    if gnn_explanation_type_norm not in {"model", "phenomenon"}:
+        raise ValueError("gnn_explanation_type must be one of: model | phenomenon")
+    if ig_explanation_type is None:
+        ig_explanation_type_norm = gnn_explanation_type_norm
+    else:
+        ig_explanation_type_norm = str(ig_explanation_type).strip().lower()
+    if ig_explanation_type_norm not in {"model", "phenomenon"}:
+        raise ValueError("ig_explanation_type must be one of: model | phenomenon")
 
     device = get_device(None)
     rng = random.Random(int(seed))
@@ -791,9 +1091,15 @@ def run_experiments_evaluation(
         print(f"Node types: {clean_node_types}")
         print(f"Sparsity target: {sparsity}")
         print(
+            f"Explanation types: GNN={gnn_explanation_type_norm}, "
+            f"IG={ig_explanation_type_norm}"
+        )
+        print(
             f"Mask baseline mode: {mask_baseline_mode} "
             f"(IG baseline mode: {ig_baseline_mode})"
         )
+        if str(ig_baseline_mode).lower() == "scientific":
+            print(f"IG scientific strict mode: {bool(ig_scientific_strict)}")
 
     median_cache: Dict[str, Tuple[torch.Tensor, Dict[str, torch.Tensor]]] = {}
     elem_distribution_cache: Dict[str, torch.Tensor] = {}
@@ -915,13 +1221,14 @@ def run_experiments_evaluation(
             gnn_explainer = Explainer(
                 model=wrapped_model,
                 algorithm=algorithm,
-                explanation_type=gnn_explanation_type,
+                explanation_type=gnn_explanation_type_norm,
                 model_config=model_config,
                 node_mask_type="attributes",
                 edge_mask_type="object",
             )
 
-            gnn_target = target_tensor if (gnn_explanation_type == "phenomenon" and target_tensor is not None) else None
+            gnn_target = target_tensor if (gnn_explanation_type_norm == "phenomenon" and target_tensor is not None) else None
+            ig_target = target_tensor if (ig_explanation_type_norm == "phenomenon" and target_tensor is not None) else None
 
             for node_idx in node_indices:
                 target_value = get_target_value(y_dict, node_type, node_idx)
@@ -965,6 +1272,7 @@ def run_experiments_evaluation(
                     gnn_importance = exp_extract_gnn_feature_importance(
                         gnn_explanation, node_type=node_type, node_idx=node_idx
                     )
+                    gnn_importance_scope = exp_extract_gnn_global_feature_importance(gnn_explanation)
                     gnn_metrics = exp_feature_fidelity_for_node(
                         base_model=base_model,
                         x_dict=x_dict_base,
@@ -981,6 +1289,7 @@ def run_experiments_evaluation(
                         median_cache=median_cache,
                         elem_distribution_cache=elem_distribution_cache,
                         cache_dir=context.output_dir.parent / "baselines",
+                        importance_by_node_type=gnn_importance_scope,
                         pred_orig=pred_orig,
                         target_value=target_value,
                     )
@@ -1034,32 +1343,11 @@ def run_experiments_evaluation(
 
                 # Integrated Gradients
                 try:
-                    ig_result = compute_ig_explanation(
-                        base_model=base_model,
-                        data=data,
-                        node_type=node_type,
-                        node_idx=node_idx,
-                        x_dict={nt: feat.clone() for nt, feat in x_dict_base.items()},
-                        edge_index_dict=edge_index_dict,
-                        edge_attr_dict=(
-                            {etype: (attrs.clone() if attrs is not None else None) for etype, attrs in edge_attr_base.items()}
-                            if edge_attr_base is not None
-                            else None
-                        ),
-                        device=device,
-                        n_steps=ig_n_steps,
-                        baseline_type=ig_baseline_mode,
-                        include_neighbors=False,
-                        k_hops=1,
-                        median_global=(median_cache[node_type][0] if node_type in median_cache else None),
-                        median_by_element=(median_cache[node_type][1] if node_type in median_cache else None),
-                        elem_distribution=elem_distribution_cache.get("value"),
-                        dataset=dataset,
-                        train_graph_indices=train_graph_indices,
-                        train_split_path=str(context.split_path) if context.split_path.exists() else None,
-                    )
-                except Exception as exc_first:
-                    if ig_baseline_mode == "scientific":
+                    if ig_target is not None and torch.isnan(ig_target[node_idx]):
+                        raise ValueError("Target is NaN for IG phenomenon explanation.")
+                    if ig_explanation_type_norm == "phenomenon" and ig_target is None:
+                        raise ValueError("No target tensor for IG phenomenon explanation.")
+                    try:
                         ig_result = compute_ig_explanation(
                             base_model=base_model,
                             data=data,
@@ -1073,26 +1361,59 @@ def run_experiments_evaluation(
                                 else None
                             ),
                             device=device,
+                            target=ig_target,
                             n_steps=ig_n_steps,
-                            baseline_type="mean",
+                            baseline_type=ig_baseline_mode,
                             include_neighbors=False,
+                            include_all_nodes=True,
                             k_hops=1,
-                            median_global=None,
-                            median_by_element=None,
-                            elem_distribution=None,
+                            median_global=(median_cache[node_type][0] if node_type in median_cache else None),
+                            median_by_element=(median_cache[node_type][1] if node_type in median_cache else None),
+                            elem_distribution=elem_distribution_cache.get("value"),
                             dataset=dataset,
                             train_graph_indices=train_graph_indices,
                             train_split_path=str(context.split_path) if context.split_path.exists() else None,
+                            explanation_type=ig_explanation_type_norm,
                         )
-                    else:
-                        raise exc_first
+                    except Exception as exc_first:
+                        scientific_mode = str(ig_baseline_mode).lower() == "scientific"
+                        if scientific_mode and (not ig_scientific_strict):
+                            ig_result = compute_ig_explanation(
+                                base_model=base_model,
+                                data=data,
+                                node_type=node_type,
+                                node_idx=node_idx,
+                                x_dict={nt: feat.clone() for nt, feat in x_dict_base.items()},
+                                edge_index_dict=edge_index_dict,
+                                edge_attr_dict=(
+                                    {etype: (attrs.clone() if attrs is not None else None) for etype, attrs in edge_attr_base.items()}
+                                    if edge_attr_base is not None
+                                    else None
+                                ),
+                                device=device,
+                                target=ig_target,
+                                n_steps=ig_n_steps,
+                                baseline_type="mean",
+                                include_neighbors=False,
+                                include_all_nodes=True,
+                                k_hops=1,
+                                median_global=None,
+                                median_by_element=None,
+                                elem_distribution=None,
+                                dataset=dataset,
+                                train_graph_indices=train_graph_indices,
+                                train_split_path=str(context.split_path) if context.split_path.exists() else None,
+                                explanation_type=ig_explanation_type_norm,
+                            )
+                        else:
+                            raise exc_first
 
-                try:
                     ig_importance = exp_extract_ig_feature_importance(
                         ig_result,
                         node_type=node_type,
                         node_idx=node_idx,
                     )
+                    ig_importance_scope = exp_extract_ig_global_feature_importance(ig_result)
                     ig_metrics = exp_feature_fidelity_for_node(
                         base_model=base_model,
                         x_dict=x_dict_base,
@@ -1109,6 +1430,7 @@ def run_experiments_evaluation(
                         median_cache=median_cache,
                         elem_distribution_cache=elem_distribution_cache,
                         cache_dir=context.output_dir.parent / "baselines",
+                        importance_by_node_type=ig_importance_scope,
                         pred_orig=pred_orig,
                         target_value=target_value,
                     )
@@ -1187,9 +1509,16 @@ def run_experiments_evaluation(
         "ig_baseline_mode": ig_baseline_mode,
         "gnn_epochs": int(gnn_epochs),
         "gnn_lr": float(gnn_lr),
-        "gnn_explanation_type": gnn_explanation_type,
+        "gnn_explanation_type": gnn_explanation_type_norm,
+        "ig_explanation_type": ig_explanation_type_norm,
         "gnn_use_custom_coeffs": bool(gnn_use_custom_coeffs),
+        "gnn_coeffs": (
+            {str(k): float(v) for k, v in dict(gnn_coeffs).items()}
+            if gnn_use_custom_coeffs and gnn_coeffs
+            else None
+        ),
         "ig_n_steps": int(ig_n_steps),
+        "ig_scientific_strict": bool(ig_scientific_strict),
         "gnn_edge_selection_scope": "global_all_edges",
         "gnn_edge_keep_mode": "topk_only",
         "gnn_edge_ranking": "abs(edge_mask)",
@@ -1241,3 +1570,545 @@ def build_default_context(
         split_path=resolve_path(split_file, project_root),
         output_dir=resolve_path(output_dir, project_root),
     )
+
+
+def run_fidelity_grid_evaluation(
+    context: ExperimentContext,
+    node_types: Sequence[str] = ("H", "C"),
+    sparsities: Sequence[float] = (0.5, 0.6, 0.7, 0.8, 0.9),
+    mask_variants: Sequence[str] = ("zero", "scientific"),
+    gnn_epochs: int = 200,
+    gnn_lr: float = 0.01,
+    gnn_explanation_type: str = "phenomenon",
+    ig_n_steps: int = 64,
+    max_graphs: Optional[int] = None,
+    max_nodes_per_graph: int = 0,
+    include_gnn_edge_report: bool = True,
+    seed: int = 42,
+    verbose: bool = True,
+    progress_enabled: bool = True,
+    progress_use_tqdm: bool = True,
+    run_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    if not sparsities:
+        raise ValueError("sparsities must not be empty.")
+    if not mask_variants:
+        raise ValueError("mask_variants must not be empty.")
+
+    mask_to_baseline = {
+        "zero": "zero",
+        "scientific": "match_ig_baseline",
+    }
+    normalized_masks = [str(m).strip().lower() for m in mask_variants]
+    invalid_masks = sorted(set(m for m in normalized_masks if m not in mask_to_baseline))
+    if invalid_masks:
+        raise ValueError(
+            f"Unsupported mask variants: {invalid_masks}. Allowed: {sorted(mask_to_baseline.keys())}"
+        )
+
+    sparsity_values = [float(s) for s in sparsities]
+    for s in sparsity_values:
+        if not np.isfinite(s) or s < 0.0 or s > 1.0:
+            raise ValueError(f"Invalid sparsity value: {s}. Expected finite value in [0, 1].")
+
+    fixed_gnn_coeffs = {
+        "edge_size": 1e-3,
+        "edge_ent": 1e-3,
+        "node_feat_size": 1e-12,
+        "node_feat_ent": 1e-12,
+    }
+
+    run_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    raw_name = str(run_name).strip() if run_name is not None else ""
+    safe_name = "".join(ch if (ch.isalnum() or ch in "-_.") else "_" for ch in raw_name)
+    run_slug = safe_name if safe_name else f"fidelity_grid_{run_stamp}"
+
+    run_dir = Path(context.output_dir) / run_slug
+    run_dir.mkdir(parents=True, exist_ok=True)
+    plots_dir = run_dir / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    progress_node_csv = run_dir / "grid_progress_node_metrics.csv"
+    progress_summary_csv = run_dir / "grid_progress_summary.csv"
+    progress_edge_csv = run_dir / "grid_progress_edge_metrics.csv"
+    progress_edge_summary_csv = run_dir / "grid_progress_edge_summary.csv"
+    progress_status_csv = run_dir / "grid_progress_run_status.csv"
+    progress_manifest_json = run_dir / "grid_progress_manifest.json"
+
+    final_node_csv = run_dir / "grid_node_metrics_all.csv"
+    final_summary_csv = run_dir / "grid_summary_all.csv"
+    final_plot_input_csv = run_dir / "grid_plot_input.csv"
+    final_edge_csv = run_dir / "grid_edge_metrics_all.csv"
+    final_edge_summary_csv = run_dir / "grid_edge_summary_all.csv"
+    final_edge_plot_input_csv = run_dir / "grid_edge_plot_input.csv"
+    final_status_csv = run_dir / "grid_run_status.csv"
+    final_manifest_json = run_dir / "grid_manifest_final.json"
+
+    run_plan: List[Tuple[float, str]] = []
+    for sparsity in sparsity_values:
+        for mask_variant in normalized_masks:
+            run_plan.append((float(sparsity), str(mask_variant)))
+
+    def _last_file(path: Path, pattern: str) -> Optional[str]:
+        matches = sorted(path.glob(pattern))
+        if not matches:
+            return None
+        return str(matches[-1])
+
+    combined_node_parts: List[pd.DataFrame] = []
+    combined_edge_parts: List[pd.DataFrame] = []
+    run_records: List[Dict[str, Any]] = []
+
+    if verbose:
+        print("Starting fidelity grid evaluation")
+        print(f"  output dir: {run_dir}")
+        print(f"  runs: {len(run_plan)}")
+        print(f"  sparsities: {sparsity_values}")
+        print(f"  mask variants: {normalized_masks}")
+        print("  fixed scope: graph_scope='test_split', first_graph_per_component=True, component_key='compound'")
+        print(f"  fixed GNN coeffs: {fixed_gnn_coeffs}")
+
+    total_runs = int(len(run_plan))
+    for run_idx, (sparsity, mask_variant) in enumerate(run_plan, start=1):
+        run_id = f"run_{run_idx:02d}_s{int(round(sparsity * 100.0)):02d}_{mask_variant}"
+        subrun_dir = run_dir / run_id
+        subrun_dir.mkdir(parents=True, exist_ok=True)
+        sub_context = ExperimentContext(
+            model_path=context.model_path,
+            data_path=context.data_path,
+            config_path=context.config_path,
+            norm_stats_path=context.norm_stats_path,
+            edge_stats_path=context.edge_stats_path,
+            split_path=context.split_path,
+            output_dir=subrun_dir,
+        )
+
+        status = "success"
+        error_message = ""
+        node_df_run = pd.DataFrame()
+        summary_df_run = pd.DataFrame()
+        fair_df_run = pd.DataFrame()
+        edge_df_run = pd.DataFrame()
+
+        if verbose:
+            print(
+                f"[{run_idx}/{total_runs}] sparsity={sparsity:.2f} "
+                f"mask_variant={mask_variant} (mask_baseline={mask_to_baseline[mask_variant]})"
+            )
+
+        try:
+            node_df_run, summary_df_run, fair_df_run, edge_df_run = run_experiments_evaluation(
+                context=sub_context,
+                node_types=node_types,
+                sparsity=float(sparsity),
+                mask_baseline_mode=str(mask_to_baseline[mask_variant]),
+                ig_baseline_mode="scientific",
+                gnn_epochs=int(gnn_epochs),
+                gnn_lr=float(gnn_lr),
+                gnn_explanation_type=str(gnn_explanation_type),
+                ig_explanation_type=str(gnn_explanation_type),
+                gnn_use_custom_coeffs=True,
+                gnn_coeffs=fixed_gnn_coeffs,
+                ig_n_steps=int(ig_n_steps),
+                ig_scientific_strict=True,
+                graph_scope="test_split",
+                first_graph_per_component=True,
+                component_key="compound",
+                max_graphs=max_graphs,
+                max_nodes_per_graph=int(max_nodes_per_graph),
+                include_gnn_edge_report=bool(include_gnn_edge_report),
+                seed=int(seed),
+                verbose=bool(verbose),
+                progress_enabled=bool(progress_enabled),
+                progress_use_tqdm=bool(progress_use_tqdm),
+            )
+        except Exception as exc:
+            status = "failed"
+            error_message = f"{type(exc).__name__}: {exc}"
+            if verbose:
+                print(f"  run failed: {error_message}")
+
+        if status == "success" and node_df_run is not None and not node_df_run.empty:
+            node_aug = node_df_run.copy()
+            node_aug["grid_run_id"] = run_id
+            node_aug["mask_variant"] = str(mask_variant)
+            node_aug["sparsity_target_requested"] = float(sparsity)
+            combined_node_parts.append(node_aug)
+        if status == "success" and edge_df_run is not None and not edge_df_run.empty:
+            edge_aug = edge_df_run.copy()
+            edge_aug["grid_run_id"] = run_id
+            edge_aug["mask_variant"] = str(mask_variant)
+            edge_aug["sparsity_target_requested"] = float(sparsity)
+            combined_edge_parts.append(edge_aug)
+
+        artifacts = {
+            "run_output_dir": str(subrun_dir),
+            "node_level_metrics": _last_file(subrun_dir, "node_level_metrics_*.csv"),
+            "summary_by_method_and_type": _last_file(subrun_dir, "summary_by_method_and_type_*.csv"),
+            "fair_comparison": _last_file(subrun_dir, "fair_comparison_H_C_*.csv"),
+            "gnn_edge_summary": _last_file(subrun_dir, "gnn_edge_summary_*.csv"),
+            "failed_nodes": _last_file(subrun_dir, "failed_nodes_*.csv"),
+            "run_config": _last_file(subrun_dir, "run_config_*.json"),
+        }
+        run_records.append(
+            {
+                "run_index": int(run_idx),
+                "run_id": str(run_id),
+                "status": str(status),
+                "error": str(error_message),
+                "sparsity_target": float(sparsity),
+                "mask_variant": str(mask_variant),
+                "mask_baseline_mode": str(mask_to_baseline[mask_variant]),
+                "ig_baseline_mode": "scientific",
+                "node_rows": int(len(node_df_run)) if isinstance(node_df_run, pd.DataFrame) else 0,
+                "summary_rows": int(len(summary_df_run)) if isinstance(summary_df_run, pd.DataFrame) else 0,
+                "fair_rows": int(len(fair_df_run)) if isinstance(fair_df_run, pd.DataFrame) else 0,
+                "edge_rows": int(len(edge_df_run)) if isinstance(edge_df_run, pd.DataFrame) else 0,
+                "artifacts": artifacts,
+            }
+        )
+
+        combined_node_df = (
+            pd.concat(combined_node_parts, ignore_index=True)
+            if combined_node_parts
+            else pd.DataFrame()
+        )
+        combined_summary_df = (
+            build_fidelity_grid_summary(combined_node_df)
+            if not combined_node_df.empty
+            else pd.DataFrame()
+        )
+        combined_edge_df = (
+            pd.concat(combined_edge_parts, ignore_index=True)
+            if combined_edge_parts
+            else pd.DataFrame()
+        )
+        combined_edge_summary_df = (
+            build_fidelity_grid_summary(combined_edge_df)
+            if not combined_edge_df.empty
+            else pd.DataFrame()
+        )
+        run_status_df = pd.DataFrame(run_records)
+
+        combined_node_df.to_csv(progress_node_csv, index=False)
+        combined_summary_df.to_csv(progress_summary_csv, index=False)
+        combined_edge_df.to_csv(progress_edge_csv, index=False)
+        combined_edge_summary_df.to_csv(progress_edge_summary_csv, index=False)
+        run_status_df.to_csv(progress_status_csv, index=False)
+
+        progress_manifest = {
+            "updated_at": datetime.now().isoformat(),
+            "run_dir": str(run_dir),
+            "total_runs": int(total_runs),
+            "completed_runs": int(len(run_records)),
+            "successful_runs": int(sum(1 for r in run_records if r.get("status") == "success")),
+            "failed_runs": int(sum(1 for r in run_records if r.get("status") != "success")),
+            "progress_artifacts": {
+                "node_metrics": str(progress_node_csv),
+                "summary": str(progress_summary_csv),
+                "edge_metrics": str(progress_edge_csv),
+                "edge_summary": str(progress_edge_summary_csv),
+                "run_status": str(progress_status_csv),
+            },
+            "runs": run_records,
+        }
+        with progress_manifest_json.open("w", encoding="utf-8") as handle:
+            json.dump(progress_manifest, handle, indent=2)
+
+    combined_node_df = (
+        pd.concat(combined_node_parts, ignore_index=True)
+        if combined_node_parts
+        else pd.DataFrame()
+    )
+    combined_summary_df = (
+        build_fidelity_grid_summary(combined_node_df)
+        if not combined_node_df.empty
+        else pd.DataFrame()
+    )
+    run_status_df = pd.DataFrame(run_records)
+    combined_edge_df = (
+        pd.concat(combined_edge_parts, ignore_index=True)
+        if combined_edge_parts
+        else pd.DataFrame()
+    )
+    combined_edge_summary_df = (
+        build_fidelity_grid_summary(combined_edge_df)
+        if not combined_edge_df.empty
+        else pd.DataFrame()
+    )
+
+    plot_input_cols = [
+        "mask_variant",
+        "sparsity_target",
+        "method",
+        "node_type",
+        "fid_plus_model_mean",
+        "fid_plus_model_std",
+        "fid_plus_model_count",
+        "fid_minus_model_mean",
+        "fid_minus_model_std",
+        "fid_minus_model_count",
+        "n_nodes",
+        "n_graphs",
+    ]
+    if not combined_summary_df.empty:
+        available_cols = [col for col in plot_input_cols if col in combined_summary_df.columns]
+        plot_input_df = combined_summary_df[available_cols].copy()
+    else:
+        plot_input_df = pd.DataFrame(columns=plot_input_cols)
+    if not combined_edge_summary_df.empty:
+        edge_available_cols = [col for col in plot_input_cols if col in combined_edge_summary_df.columns]
+        edge_plot_input_df = combined_edge_summary_df[edge_available_cols].copy()
+    else:
+        edge_plot_input_df = pd.DataFrame(columns=plot_input_cols)
+
+    combined_node_df.to_csv(final_node_csv, index=False)
+    combined_summary_df.to_csv(final_summary_csv, index=False)
+    plot_input_df.to_csv(final_plot_input_csv, index=False)
+    combined_edge_df.to_csv(final_edge_csv, index=False)
+    combined_edge_summary_df.to_csv(final_edge_summary_csv, index=False)
+    edge_plot_input_df.to_csv(final_edge_plot_input_csv, index=False)
+    run_status_df.to_csv(final_status_csv, index=False)
+
+    plot_paths = {
+        "fid_plus_zero": str(plots_dir / "fid_plus_zero.png"),
+        "fid_minus_zero": str(plots_dir / "fid_minus_zero.png"),
+        "fid_plus_scientific": str(plots_dir / "fid_plus_scientific.png"),
+        "fid_minus_scientific": str(plots_dir / "fid_minus_scientific.png"),
+        "gnn_edge_fid_plus_zero": str(plots_dir / "gnn_edge_fid_plus_zero.png"),
+        "gnn_edge_fid_minus_zero": str(plots_dir / "gnn_edge_fid_minus_zero.png"),
+        "gnn_edge_fid_plus_scientific": str(plots_dir / "gnn_edge_fid_plus_scientific.png"),
+        "gnn_edge_fid_minus_scientific": str(plots_dir / "gnn_edge_fid_minus_scientific.png"),
+    }
+    plot_fidelity_vs_sparsity(
+        summary_df=combined_summary_df,
+        mask_variant="zero",
+        metric="fid_plus_model",
+        output_path=Path(plot_paths["fid_plus_zero"]),
+        title="Fidelity+ vs Sparsity (zero mask baseline)",
+    )
+    plot_fidelity_vs_sparsity(
+        summary_df=combined_summary_df,
+        mask_variant="zero",
+        metric="fid_minus_model",
+        output_path=Path(plot_paths["fid_minus_zero"]),
+        title="Fidelity- vs Sparsity (zero mask baseline)",
+    )
+    plot_fidelity_vs_sparsity(
+        summary_df=combined_summary_df,
+        mask_variant="scientific",
+        metric="fid_plus_model",
+        output_path=Path(plot_paths["fid_plus_scientific"]),
+        title="Fidelity+ vs Sparsity (scientific mask baseline)",
+    )
+    plot_fidelity_vs_sparsity(
+        summary_df=combined_summary_df,
+        mask_variant="scientific",
+        metric="fid_minus_model",
+        output_path=Path(plot_paths["fid_minus_scientific"]),
+        title="Fidelity- vs Sparsity (scientific mask baseline)",
+    )
+    edge_plot_df = combined_edge_summary_df.copy()
+    if "method" in edge_plot_df.columns:
+        edge_plot_df = edge_plot_df[edge_plot_df["method"] == EXP_METHOD_GNN].copy()
+    plot_fidelity_vs_sparsity(
+        summary_df=edge_plot_df,
+        mask_variant="zero",
+        metric="fid_plus_model",
+        output_path=Path(plot_paths["gnn_edge_fid_plus_zero"]),
+        title="GNNExplainer edge fidelity+ vs Sparsity (zero mask baseline)",
+    )
+    plot_fidelity_vs_sparsity(
+        summary_df=edge_plot_df,
+        mask_variant="zero",
+        metric="fid_minus_model",
+        output_path=Path(plot_paths["gnn_edge_fid_minus_zero"]),
+        title="GNNExplainer edge fidelity- vs Sparsity (zero mask baseline)",
+    )
+    plot_fidelity_vs_sparsity(
+        summary_df=edge_plot_df,
+        mask_variant="scientific",
+        metric="fid_plus_model",
+        output_path=Path(plot_paths["gnn_edge_fid_plus_scientific"]),
+        title="GNNExplainer edge fidelity+ vs Sparsity (scientific mask baseline)",
+    )
+    plot_fidelity_vs_sparsity(
+        summary_df=edge_plot_df,
+        mask_variant="scientific",
+        metric="fid_minus_model",
+        output_path=Path(plot_paths["gnn_edge_fid_minus_scientific"]),
+        title="GNNExplainer edge fidelity- vs Sparsity (scientific mask baseline)",
+    )
+
+    final_manifest = {
+        "timestamp": run_stamp,
+        "run_dir": str(run_dir),
+        "total_runs": int(total_runs),
+        "successful_runs": int(sum(1 for r in run_records if r.get("status") == "success")),
+        "failed_runs": int(sum(1 for r in run_records if r.get("status") != "success")),
+        "fixed_scope": {
+            "graph_scope": "test_split",
+            "first_graph_per_component": True,
+            "component_key": "compound",
+        },
+        "grid": {
+            "sparsities": [float(s) for s in sparsity_values],
+            "mask_variants": list(normalized_masks),
+            "mask_variant_to_baseline": mask_to_baseline,
+        },
+        "ig": {
+            "baseline_mode": "scientific",
+            "scientific_strict": True,
+            "scope": "all_nodes",
+            "ig_n_steps": int(ig_n_steps),
+            "explanation_type": str(gnn_explanation_type),
+        },
+        "gnnexplainer": {
+            "epochs": int(gnn_epochs),
+            "lr": float(gnn_lr),
+            "explanation_type": str(gnn_explanation_type),
+            "coeffs": fixed_gnn_coeffs,
+        },
+        "limits": {
+            "max_graphs": int(max_graphs) if max_graphs is not None else None,
+            "max_nodes_per_graph": int(max_nodes_per_graph),
+        },
+        "artifacts": {
+            "progress_node_metrics": str(progress_node_csv),
+            "progress_summary": str(progress_summary_csv),
+            "progress_edge_metrics": str(progress_edge_csv),
+            "progress_edge_summary": str(progress_edge_summary_csv),
+            "progress_status": str(progress_status_csv),
+            "progress_manifest": str(progress_manifest_json),
+            "node_metrics_all": str(final_node_csv),
+            "summary_all": str(final_summary_csv),
+            "plot_input": str(final_plot_input_csv),
+            "edge_metrics_all": str(final_edge_csv),
+            "edge_summary_all": str(final_edge_summary_csv),
+            "edge_plot_input": str(final_edge_plot_input_csv),
+            "run_status": str(final_status_csv),
+            "plots": plot_paths,
+        },
+        "runs": run_records,
+    }
+    with final_manifest_json.open("w", encoding="utf-8") as handle:
+        json.dump(final_manifest, handle, indent=2)
+
+    if verbose:
+        print("Saved fidelity-grid artifacts:")
+        print(f"  run dir: {run_dir}")
+        print(f"  node metrics (all): {final_node_csv}")
+        print(f"  summary (all): {final_summary_csv}")
+        print(f"  plot input: {final_plot_input_csv}")
+        print(f"  edge metrics (all): {final_edge_csv}")
+        print(f"  edge summary (all): {final_edge_summary_csv}")
+        print(f"  edge plot input: {final_edge_plot_input_csv}")
+        print(f"  run status: {final_status_csv}")
+        print(f"  final manifest: {final_manifest_json}")
+        for key, path in plot_paths.items():
+            print(f"  plot {key}: {path}")
+
+    return {
+        "run_dir": str(run_dir),
+        "node_df": combined_node_df,
+        "summary_df": combined_summary_df,
+        "plot_input_df": plot_input_df,
+        "edge_df": combined_edge_df,
+        "edge_summary_df": combined_edge_summary_df,
+        "edge_plot_input_df": edge_plot_input_df,
+        "run_status_df": run_status_df,
+        "plot_paths": plot_paths,
+        "manifest": final_manifest,
+        "manifest_path": str(final_manifest_json),
+    }
+
+
+def run_fidelity_grid_smoke_test(
+    context: ExperimentContext,
+    node_types: Sequence[str] = ("H", "C"),
+    gnn_epochs: int = 200,
+    gnn_lr: float = 0.01,
+    gnn_explanation_type: str = "phenomenon",
+    ig_n_steps: int = 64,
+    seed: int = 42,
+    run_name: Optional[str] = None,
+    verbose: bool = False,
+) -> Dict[str, Any]:
+    """
+    Minimal smoke test for systematic fidelity grid evaluation.
+
+    Scope is intentionally tiny:
+      - sparsities: (0.5,)
+      - mask variants: ("zero", "scientific")
+      - max_graphs: 1
+      - max_nodes_per_graph: 2
+    """
+
+    smoke_name = (
+        run_name.strip()
+        if isinstance(run_name, str) and run_name.strip()
+        else f"fidelity_grid_smoke_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    )
+    result = run_fidelity_grid_evaluation(
+        context=context,
+        node_types=node_types,
+        sparsities=(0.5,),
+        mask_variants=("zero", "scientific"),
+        gnn_epochs=int(gnn_epochs),
+        gnn_lr=float(gnn_lr),
+        gnn_explanation_type=str(gnn_explanation_type),
+        ig_n_steps=int(ig_n_steps),
+        max_graphs=1,
+        max_nodes_per_graph=2,
+        include_gnn_edge_report=True,
+        seed=int(seed),
+        verbose=bool(verbose),
+        progress_enabled=False,
+        progress_use_tqdm=False,
+        run_name=smoke_name,
+    )
+
+    run_dir = Path(result["run_dir"])
+    required_files = [
+        run_dir / "grid_node_metrics_all.csv",
+        run_dir / "grid_summary_all.csv",
+        run_dir / "grid_plot_input.csv",
+        run_dir / "grid_edge_metrics_all.csv",
+        run_dir / "grid_edge_summary_all.csv",
+        run_dir / "grid_edge_plot_input.csv",
+        run_dir / "grid_run_status.csv",
+        run_dir / "grid_manifest_final.json",
+    ]
+    missing_files = [str(path) for path in required_files if not path.exists()]
+    if missing_files:
+        raise RuntimeError(f"Smoke test failed. Missing artifact files: {missing_files}")
+
+    required_plots = [
+        "fid_plus_zero",
+        "fid_minus_zero",
+        "fid_plus_scientific",
+        "fid_minus_scientific",
+        "gnn_edge_fid_plus_zero",
+        "gnn_edge_fid_minus_zero",
+        "gnn_edge_fid_plus_scientific",
+        "gnn_edge_fid_minus_scientific",
+    ]
+    missing_plots: List[str] = []
+    for key in required_plots:
+        plot_path = Path(str(result.get("plot_paths", {}).get(key, "")))
+        if not plot_path.exists() or plot_path.stat().st_size <= 0:
+            missing_plots.append(key)
+    if missing_plots:
+        raise RuntimeError(f"Smoke test failed. Missing/empty plot files: {missing_plots}")
+
+    status_df = result.get("run_status_df")
+    if isinstance(status_df, pd.DataFrame):
+        if len(status_df) != 2:
+            raise RuntimeError(f"Smoke test failed. Expected 2 run-status rows, got {len(status_df)}.")
+        if "status" in status_df.columns:
+            failed = status_df[status_df["status"] != "success"]
+            if not failed.empty:
+                failed_ids = failed["run_id"].astype(str).tolist() if "run_id" in failed.columns else []
+                raise RuntimeError(f"Smoke test failed. Failed runs: {failed_ids}")
+
+    return result

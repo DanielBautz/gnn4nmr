@@ -1,0 +1,49 @@
+ablation_feature_key,ablation_feature_name,ablation_node_type,delta_mae_H,delta_mae_C,n_seeds,display_name
+orb_charge_loew_d_C,orb_charge_loew_d,C,0.004033,-0.019110,3,orb charge loew d
+BO_loew_sum_C,BO_loew_sum,C,0.003922,-0.009077,3,BO loew sum
+orb_charge_loew_p_H,orb_charge_loew_p,H,0.003568,0.030299,4,orb charge loew p
+shift_low_H,shift_low,H,0.003477,0.018644,4,shift low
+orb_charge_loew_s_H,orb_charge_loew_s,H,0.003273,0.016888,4,orb charge loew s
+orb_charge_loew_p_C,orb_charge_loew_p,C,0.003241,0.009520,3,orb charge loew p
+orb_charge_mull_d_C,orb_charge_mull_d,C,0.003239,0.057075,3,orb charge mull d
+mayer_VA_C,mayer_VA,C,0.003013,0.037944,2,mayer VA
+orb_charge_loew_s_C,orb_charge_loew_s,C,0.002954,0.011712,3,orb charge loew s
+mass_C,mass,C,0.002625,-0.002650,4,mass
+at_charge_loew_H,at_charge_loew,H,0.002561,-0.008284,4,at charge loew
+mass_H,mass,H,0.002525,0.012284,4,mass
+span_H,span,H,0.002512,0.063445,4,span
+orb_charge_mull_s_H,orb_charge_mull_s,H,0.002461,0.004359,4,orb charge mull s
+orb_stdev_loew_p_C,orb_stdev_loew_p,C,0.002256,-0.018748,3,orb stdev loew p
+at_charge_mull_C,at_charge_mull,C,0.002226,-0.018062,4,at charge mull
+BO_mayer_H,BO_mayer,H,0.002199,-0.028902,4,BO mayer
+BO_loew_av_C,BO_loew_av,C,0.002170,-0.008956,2,BO loew av
+nodetype_onehot_H,nodetype_onehot,H,0.001995,0.013067,4,nodetype onehot
+mayer_VA_H,mayer_VA,H,0.001965,0.030959,4,mayer VA
+degree_H,degree,H,0.001958,-0.013402,4,degree
+formal_charge_H,formal_charge,H,0.001955,0.003239,4,formal charge
+span_C,span,C,0.001934,0.040493,4,span
+shielding_para_C,shielding_para,C,0.001911,0.033076,4,shielding para
+shielding_dia_C,shielding_dia,C,0.001902,0.010559,4,shielding dia
+shift_low_C,shift_low,C,0.001878,0.052338,4,shift low
+BO_loew_H,BO_loew,H,0.001740,-0.027918,4,BO loew
+asymmetry_H,asymmetry,H,0.001725,-0.038490,4,asymmetry
+shielding_para_H,shielding_para,H,0.001670,0.060167,4,shielding para
+CNX_H,CN(X),H,0.001638,0.043070,4,CN(X)
+orb_charge_mull_p_H,orb_charge_mull_p,H,0.001618,0.024563,4,orb charge mull p
+shielding_dia_H,shielding_dia,H,0.001520,0.019875,4,shielding dia
+BO_mayer_sum_C,BO_mayer_sum,C,0.001441,-0.076289,2,BO mayer sum
+nodetype_onehot_C,nodetype_onehot,C,0.001356,-0.010225,4,nodetype onehot
+at_charge_loew_C,at_charge_loew,C,0.001281,0.025543,4,at charge loew
+orb_charge_mull_s_C,orb_charge_mull_s,C,0.001241,-0.060121,4,orb charge mull s
+at_charge_mull_H,at_charge_mull,H,0.001207,-0.013201,4,at charge mull
+anisotropy_C,anisotropy,C,0.001081,-0.014558,4,anisotropy
+degree_C,degree,C,0.001001,-0.034866,4,degree
+orb_stdev_mull_p_C,orb_stdev_mull_p,C,0.000788,-0.029931,3,orb stdev mull p
+orb_charge_mull_p_C,orb_charge_mull_p,C,0.000776,-0.035981,4,orb charge mull p
+BO_mayer_av_C,BO_mayer_av,C,0.000759,0.004053,2,BO mayer av
+anisotropy_H,anisotropy,H,0.000630,-0.021975,4,anisotropy
+skew_C,skew,C,0.000560,0.025198,4,skew
+formal_charge_C,formal_charge,C,0.000507,-0.032883,4,formal charge
+asymmetry_C,asymmetry,C,0.000398,-0.030667,4,asymmetry
+skew_H,skew,H,-0.000107,-0.031993,4,skew
+CNX_C,CN(X),C,-0.000720,-0.063106,4,CN(X)

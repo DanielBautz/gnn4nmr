@@ -1,0 +1,49 @@
+{
+  "timestamp": "20260308_211313",
+  "model_path": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\models\\GraphConv_best_model.pt",
+  "data_path": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\data\\all_graphs_with_length.pkl",
+  "split_path": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\models\\graph_split.pkl",
+  "graph_scope": "test_split",
+  "graph_source": "test_split",
+  "first_graph_per_component": true,
+  "component_key": "compound",
+  "graph_count_before_component_filter": 150,
+  "graph_count_after_component_filter": 15,
+  "graphs_evaluated": 1,
+  "node_types": [
+    "H",
+    "C"
+  ],
+  "sparsity_target": 0.5,
+  "mask_baseline_mode": "match_ig_baseline",
+  "ig_baseline_mode": "scientific",
+  "gnn_epochs": 200,
+  "gnn_lr": 0.01,
+  "gnn_explanation_type": "phenomenon",
+  "ig_explanation_type": "phenomenon",
+  "gnn_use_custom_coeffs": true,
+  "gnn_coeffs": {
+    "edge_size": 0.001,
+    "edge_ent": 0.001,
+    "node_feat_size": 1e-12,
+    "node_feat_ent": 1e-12
+  },
+  "ig_n_steps": 64,
+  "ig_scientific_strict": true,
+  "gnn_edge_selection_scope": "global_all_edges",
+  "gnn_edge_keep_mode": "topk_only",
+  "gnn_edge_ranking": "abs(edge_mask)",
+  "max_graphs": 1,
+  "max_nodes_per_graph": 2,
+  "rows_node_metrics": 8,
+  "rows_gnn_edge": 4,
+  "rows_failures": 0,
+  "shared_nodes_count": 4,
+  "artifacts": {
+    "node_level_metrics": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\fidelity_grid_smoke_20260308_211230\\run_02_s50_scientific\\node_level_metrics_20260308_211313.csv",
+    "summary_by_method_and_type": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\fidelity_grid_smoke_20260308_211230\\run_02_s50_scientific\\summary_by_method_and_type_20260308_211313.csv",
+    "fair_comparison_H_C": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\fidelity_grid_smoke_20260308_211230\\run_02_s50_scientific\\fair_comparison_H_C_20260308_211313.csv",
+    "gnn_edge_summary": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\fidelity_grid_smoke_20260308_211230\\run_02_s50_scientific\\gnn_edge_summary_20260308_211313.csv",
+    "failed_nodes": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\experiments\\fidelity_grid_smoke_20260308_211230\\run_02_s50_scientific\\failed_nodes_20260308_211313.csv"
+  }
+}

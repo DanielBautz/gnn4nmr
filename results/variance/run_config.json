@@ -1,0 +1,50 @@
+{
+  "model_file": "GraphConv_best_model.pt",
+  "data_file": "all_graphs_with_length_filtered.pkl",
+  "split_file": "models/graph_split.pkl",
+  "graph_scope": "full_dataset",
+  "first_graph_per_component": true,
+  "component_key": "compound",
+  "node_types": [
+    "H",
+    "C"
+  ],
+  "repeats": 5,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "max_graphs": 0,
+  "max_nodes_per_graph": 0,
+  "gnn_epochs": 200,
+  "gnn_lr": 0.01,
+  "gnn_explanation_type": "phenomenon",
+  "output_dir": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance",
+  "plots_dir": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\plots",
+  "counts": {
+    "graphs_in_scope": 712,
+    "unique_compounds_in_scope": 73,
+    "graphs_selected": 73,
+    "candidate_nodes": 795,
+    "run_rows": 3975,
+    "node_variance_rows": 795,
+    "feature_importance_dim_rows": 57240,
+    "edge_importance_dim_rows": 21162,
+    "feature_variance_rows": 144,
+    "graph_edge_rows": 73,
+    "failed_rows": 0
+  },
+  "artifacts": {
+    "explanation_runs_raw": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\explanation_runs_raw.csv",
+    "node_level_variance": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\node_level_variance.csv",
+    "feature_importance_dim": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\feature_importance_dim.csv",
+    "edge_importance_dim": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\edge_importance_dim.csv",
+    "feature_variance_by_target": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\feature_variance_by_target.csv",
+    "graph_edge_variance": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\graph_edge_variance.csv",
+    "failed_explanations": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\failed_explanations.csv",
+    "run_config": "c:\\Uni\\Lab\\gnn4nmr-lab\\gnn4nmr\\results\\variance\\run_config.json"
+  }
+}

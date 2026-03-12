@@ -1,0 +1,89 @@
+Features         , Nodetype, GNNExplainer H, GNNExplainer C, Integrated Gradients H, Integrated Gradients C, Ablation-Study H, Ablation-Study C
+element_H        , H       ,              0,              0,                      0,                      0,                0,                0
+element_C        , H       ,              0,              0,                      0,                      0,                0,                0
+element_Li       , H       ,              0,              0,                      0,                      0,                0,                0
+element_B        , H       ,              0,              0,                      0,                      0,                0,                0
+element_N        , H       ,              0,              0,                      0,                      0,                0,                0
+element_O        , H       ,              0,              0,                      0,                      0,                0,                0
+element_Na       , H       ,              0,              0,                      0,                      0,                0,                0
+element_Mg       , H       ,              0,              0,                      0,                      0,                0,                0
+element_Al       , H       ,              0,              0,                      0,                      0,                0,                0
+element_Si       , H       ,              0,              0,                      0,                      0,                0,                0
+element_P        , H       ,              0,              0,                      0,                      0,                0,                0
+element_S        , H       ,              0,              0,                      0,                      0,                0,                0
+element_Cl       , H       ,              0,              0,                      0,                      0,                0,                0
+mass             , H       ,              0,              0,                      0,                      0,                1,                0
+formal_charge    , H       ,              0,              0,                      0,                      0,                1,                0
+degree           , H       ,              0,              0,                      0,                      0,                1,                0
+shift_low        , H       ,              0,              1,                      1,                      1,                1,                0
+CN(X)            , H       ,              0,              0,                      1,                      0,                0,                1
+shielding_dia    , H       ,              0,              0,                      1,                      0,                0,                1
+shielding_para   , H       ,              0,              1,                      1,                      1,                0,                1
+span             , H       ,              0,              0,                      1,                      0,                1,                1
+skew             , H       ,              0,              0,                      1,                      0,                0,                0
+asymmetry        , H       ,              0,              0,                      1,                      0,                1,                0
+anisotropy       , H       ,              0,              0,                      1,                      0,                0,                0
+at_charge_mull   , H       ,              0,              0,                      1,                      0,                0,                0
+at_charge_loew   , H       ,              0,              0,                      1,                      0,                1,                0
+orb_charge_mull_s, H       ,              0,              0,                      1,                      0,                1,                0
+orb_charge_mull_p, H       ,              0,              0,                      1,                      0,                0,                1
+orb_charge_loew_s, H       ,              0,              0,                      1,                      0,                1,                0
+orb_charge_loew_p, H       ,              0,              0,                      1,                      0,                1,                1
+BO_loew          , H       ,              0,              0,                      1,                      0,                1,                0
+BO_mayer         , H       ,              0,              0,                      0,                      0,                1,                0
+mayer_VA         , H       ,              0,              0,                      1,                      0,                1,                1
+element_H        , C       ,              0,              0,                      0,                      0,                1,                0
+element_C        , C       ,              0,              1,                      0,                      0,                0,                0
+element_Li       , C       ,              0,              0,                      0,                      0,                0,                0
+element_B        , C       ,              0,              0,                      0,                      0,                0,                0
+element_N        , C       ,              0,              0,                      0,                      0,                0,                0
+element_O        , C       ,              0,              0,                      0,                      0,                0,                0
+element_Na       , C       ,              0,              0,                      0,                      0,                0,                0
+element_Mg       , C       ,              0,              0,                      0,                      0,                0,                0
+element_Al       , C       ,              0,              0,                      0,                      0,                0,                0
+element_Si       , C       ,              0,              0,                      0,                      0,                0,                0
+element_P        , C       ,              0,              0,                      0,                      0,                0,                0
+element_S        , C       ,              0,              0,                      0,                      0,                0,                0
+element_Cl       , C       ,              0,              0,                      0,                      0,                0,                0
+mass             , C       ,              0,              0,                      0,                      0,                1,                0
+formal_charge    , C       ,              0,              0,                      0,                      0,                0,                0
+degree           , C       ,              1,              1,                      0,                      1,                0,                0
+shift_low        , C       ,              1,              1,                      1,                      1,                1,                1
+CN(X)            , C       ,              1,              1,                      1,                      1,                0,                0
+shielding_dia    , C       ,              1,              1,                      1,                      1,                1,                0
+shielding_para   , C       ,              1,              1,                      1,                      1,                1,                1
+span             , C       ,              1,              1,                      1,                      1,                1,                1
+skew             , C       ,              1,              1,                      0,                      1,                0,                1
+asymmetry        , C       ,              1,              1,                      1,                      1,                0,                0
+anisotropy       , C       ,              1,              1,                      0,                      1,                0,                0
+at_charge_mull   , C       ,              1,              1,                      0,                      1,                1,                0
+at_charge_loew   , C       ,              1,              1,                      0,                      1,                0,                1
+orb_charge_mull_s, C       ,              1,              1,                      1,                      1,                0,                0
+orb_charge_mull_p, C       ,              1,              1,                      0,                      1,                0,                0
+orb_charge_mull_d, C       ,              1,              1,                      1,                      1,                1,                1
+orb_stdev_mull_p , C       ,              1,              1,                      1,                      1,                0,                0
+orb_charge_loew_s, C       ,              1,              1,                      1,                      1,                1,                0
+orb_charge_loew_p, C       ,              1,              1,                      0,                      1,                1,                0
+orb_charge_loew_d, C       ,              1,              1,                      0,                      1,                1,                0
+orb_stdev_loew_p , C       ,              1,              1,                      0,                      1,                1,                0
+BO_loew_sum      , C       ,              1,              1,                      0,                      1,                1,                0
+BO_loew_av       , C       ,              1,              1,                      0,                      1,                0,                0
+BO_mayer_sum     , C       ,              1,              1,                      0,                      1,                0,                0
+BO_mayer_av      , C       ,              1,              1,                      0,                      1,                0,                0
+mayer_VA         , C       ,              1,              0,                      0,                      1,                1,                0
+element_H        , Others  ,              0,              0,                      0,                      0,                0,                0
+element_C        , Others  ,              1,              0,                      0,                      0,                0,                0
+element_Li       , Others  ,              0,              0,                      0,                      0,                0,                1
+element_B        , Others  ,              0,              0,                      0,                      0,                0,                1
+element_N        , Others  ,              0,              0,                      0,                      0,                0,                1
+element_O        , Others  ,              0,              0,                      0,                      0,                0,                1
+element_Na       , Others  ,              0,              0,                      0,                      0,                0,                1
+element_Mg       , Others  ,              0,              0,                      0,                      0,                0,                1
+element_Al       , Others  ,              0,              0,                      0,                      0,                0,                1
+element_Si       , Others  ,              0,              0,                      0,                      0,                0,                1
+element_P        , Others  ,              0,              0,                      0,                      0,                0,                1
+element_S        , Others  ,              0,              0,                      0,                      0,                0,                1
+element_Cl       , Others  ,              0,              0,                      0,                      0,                0,                1
+mass             , Others  ,              1,              1,                      0,                      0,                0,                1
+formal_charge    , Others  ,              0,              0,                      0,                      0,                0,                1
+degree           , Others  ,              0,              0,                      0,                      1,                0,                1

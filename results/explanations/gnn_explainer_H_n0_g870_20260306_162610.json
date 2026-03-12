@@ -1,0 +1,122 @@
+{
+  "graph_idx": 870,
+  "node_type": "H",
+  "node_idx": 0,
+  "prediction": -0.14153453707695007,
+  "target": -0.26033154129981995,
+  "top_features": [
+    {
+      "feature_idx": 28,
+      "importance": 0.15618139505386353
+    },
+    {
+      "feature_idx": 24,
+      "importance": 0.1559651494026184
+    },
+    {
+      "feature_idx": 21,
+      "importance": 0.1545504331588745
+    },
+    {
+      "feature_idx": 29,
+      "importance": 0.15065819025039673
+    },
+    {
+      "feature_idx": 31,
+      "importance": 0.14962530136108398
+    }
+  ],
+  "important_edges": [
+    {
+      "edge_type": [
+        "Others",
+        "bond",
+        "C"
+      ],
+      "edge_position": 1,
+      "importance": 0.9374695420265198,
+      "src_index": 1,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "Others",
+        "bond",
+        "C"
+      ],
+      "edge_position": 2,
+      "importance": 0.9344176054000854,
+      "src_index": 0,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "Others",
+        "bond",
+        "C"
+      ],
+      "edge_position": 0,
+      "importance": 0.9327865242958069,
+      "src_index": 2,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "H",
+        "bond",
+        "C"
+      ],
+      "edge_position": 0,
+      "importance": 0.9317532181739807,
+      "src_index": 0,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "H"
+      ],
+      "edge_position": 0,
+      "importance": 0.9282915592193604,
+      "src_index": 0,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "Others"
+      ],
+      "edge_position": 1,
+      "importance": 0.07234493643045425,
+      "src_index": 0,
+      "dst_index": 1
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "Others"
+      ],
+      "edge_position": 2,
+      "importance": 0.05671735107898712,
+      "src_index": 0,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "Others"
+      ],
+      "edge_position": 0,
+      "importance": 0.04932256415486336,
+      "src_index": 0,
+      "dst_index": 2
+    }
+  ],
+  "gnnexplainer_epochs": 200,
+  "gnnexplainer_lr": 0.01,
+  "gnnexplainer_coeffs": null
+}

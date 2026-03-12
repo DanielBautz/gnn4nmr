@@ -1,0 +1,254 @@
+{
+  "graph_idx": 0,
+  "node_type": "H",
+  "node_idx": 0,
+  "prediction": -0.15511424839496613,
+  "target": -0.17985659837722778,
+  "top_features": [
+    {
+      "feature_idx": 0,
+      "importance": 0.156558096408844
+    },
+    {
+      "feature_idx": 17,
+      "importance": 0.1545027643442154
+    },
+    {
+      "feature_idx": 27,
+      "importance": 0.14775210618972778
+    },
+    {
+      "feature_idx": 23,
+      "importance": 0.14759258925914764
+    },
+    {
+      "feature_idx": 28,
+      "importance": 0.1469663679599762
+    }
+  ],
+  "important_edges": [
+    {
+      "edge_type": [
+        "H",
+        "bond",
+        "C"
+      ],
+      "edge_position": 3,
+      "importance": 0.9366077184677124,
+      "src_index": 3,
+      "dst_index": 1
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "H"
+      ],
+      "edge_position": 0,
+      "importance": 0.9321354031562805,
+      "src_index": 0,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 3,
+      "importance": 0.07247263193130493,
+      "src_index": 2,
+      "dst_index": 1
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "H"
+      ],
+      "edge_position": 1,
+      "importance": 0.07215035706758499,
+      "src_index": 0,
+      "dst_index": 1
+    },
+    {
+      "edge_type": [
+        "H",
+        "bond",
+        "C"
+      ],
+      "edge_position": 0,
+      "importance": 0.07171603292226791,
+      "src_index": 0,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 0,
+      "importance": 0.07145799696445465,
+      "src_index": 0,
+      "dst_index": 1
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "H"
+      ],
+      "edge_position": 2,
+      "importance": 0.06412332504987717,
+      "src_index": 0,
+      "dst_index": 2
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 1,
+      "importance": 0.06373006105422974,
+      "src_index": 1,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "H",
+        "bond",
+        "C"
+      ],
+      "edge_position": 2,
+      "importance": 0.06338818371295929,
+      "src_index": 2,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "H",
+        "bond",
+        "C"
+      ],
+      "edge_position": 1,
+      "importance": 0.0631626546382904,
+      "src_index": 1,
+      "dst_index": 0
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "H"
+      ],
+      "edge_position": 3,
+      "importance": 0.0,
+      "src_index": 1,
+      "dst_index": 3
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "H"
+      ],
+      "edge_position": 4,
+      "importance": 0.0,
+      "src_index": 2,
+      "dst_index": 4
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "H"
+      ],
+      "edge_position": 5,
+      "importance": 0.0,
+      "src_index": 4,
+      "dst_index": 5
+    },
+    {
+      "edge_type": [
+        "H",
+        "bond",
+        "C"
+      ],
+      "edge_position": 4,
+      "importance": 0.0,
+      "src_index": 4,
+      "dst_index": 2
+    },
+    {
+      "edge_type": [
+        "H",
+        "bond",
+        "C"
+      ],
+      "edge_position": 5,
+      "importance": 0.0,
+      "src_index": 5,
+      "dst_index": 4
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 2,
+      "importance": 0.0,
+      "src_index": 1,
+      "dst_index": 2
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 4,
+      "importance": 0.0,
+      "src_index": 2,
+      "dst_index": 3
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 5,
+      "importance": 0.0,
+      "src_index": 3,
+      "dst_index": 2
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 6,
+      "importance": 0.0,
+      "src_index": 3,
+      "dst_index": 4
+    },
+    {
+      "edge_type": [
+        "C",
+        "bond",
+        "C"
+      ],
+      "edge_position": 7,
+      "importance": 0.0,
+      "src_index": 4,
+      "dst_index": 3
+    }
+  ],
+  "gnnexplainer_epochs": 200,
+  "gnnexplainer_lr": 0.01,
+  "gnnexplainer_coeffs": null
+}

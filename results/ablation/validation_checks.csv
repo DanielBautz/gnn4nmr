@@ -1,5 +1,0 @@
-method,target,rows,onehot_H_ok,onehot_C_ok,clip_ok,spearman_check_ok,mae_ok
-gnnexplainer,C,48,True,True,True,True,True
-gnnexplainer,H,48,True,True,True,True,True
-integrated_gradients,C,48,True,True,True,True,True
-integrated_gradients,H,48,True,True,True,True,True

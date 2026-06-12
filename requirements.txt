@@ -1,0 +1,7 @@
+flask>=3.0
+numpy
+pandas
+networkx
+torch>=2.6
+torch_geometric>=2.6
+captum>=0.8

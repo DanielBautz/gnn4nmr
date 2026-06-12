@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GNN4NMR — NMR Shift Prediction &amp; Explainability</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <!-- 3Dmol.js (the engine behind py3Dmol) and Chart.js, pinned via CDN.
+       For offline use, vendor these files into static/vendor/. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.0.4/3Dmol-min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">GNN4NMR<span class="brand-sub">NMR shift prediction &amp; explainability</span></div>
+    <nav class="tabs">
+      <button class="tab active" data-view="explore">Explore</button>
+      <button class="tab" data-view="train">Train &amp; Models</button>
+    </nav>
+    <div class="model-chip" id="model-chip"><span class="dot"></span><span id="model-chip-text">No model loaded</span></div>
+  </header>
+
+  <main>
+    <!-- ============================== EXPLORE ============================== -->
+    <section id="view-explore" class="view">
+      <div class="explore-grid">
+        <aside class="sidebar card">
+          <div class="sidebar-head">
+            <label>Dataset
+              <select id="dataset-select"></select>
+            </label>
+            <input type="search" id="molecule-search" placeholder="Search molecules…" autocomplete="off">
+          </div>
+          <div id="molecule-list" class="molecule-list"></div>
+          <div class="list-count" id="molecule-count"></div>
+        </aside>
+
+        <section class="viewer-card card">
+          <div class="viewer-toolbar">
+            <span class="viewer-title" id="molecule-title">No molecule selected</span>
+            <div class="viewer-actions">
+              <label title="Label predicted H/C atoms with their predicted shift">
+                <input type="checkbox" id="toggle-labels"> Shift labels
+              </label>
+              <button class="btn btn-ghost" id="btn-reset-view">Reset view</button>
+            </div>
+          </div>
+          <div class="viewer-body">
+            <div id="viewer3d"></div>
+            <div class="viewer-overlay" id="viewer-overlay">
+              <span>Select a molecule from the list</span>
+            </div>
+            <div class="viewer-hint" id="viewer-hint" style="display:none">Click an atom to inspect its prediction</div>
+          </div>
+        </section>
+
+        <aside class="detail card" id="detail-panel">
+          <div class="empty">Select a molecule to see details</div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============================ TRAIN & MODELS ========================= -->
+    <section id="view-train" class="view hidden">
+      <div class="train-grid">
+        <form class="train-form card" id="train-form">
+          <h2>Train a new model</h2>
+          <div class="form-grid">
+            <label class="form-span">Model name
+              <input type="text" name="model_name" placeholder="e.g. baseline-sage">
+            </label>
+            <label class="form-span">Dataset
+              <select name="dataset_file" id="train-dataset-select"></select>
+            </label>
+            <label>Operator
+              <select name="operator_type">
+                <option>SAGEConv</option>
+                <option>GraphConv</option>
+                <option>GCNConv</option>
+                <option>GATConv</option>
+                <option>GATv2Conv</option>
+                <option>TransformerConv</option>
+                <option>GINEConv</option>
+                <option>NNConv</option>
+              </select>
+            </label>
+            <label>GNN layers
+              <input type="number" name="num_gnn_layers" value="3" min="1" max="8">
+            </label>
+            <label>Hidden dim
+              <input type="number" name="hidden_dim" value="128" min="4">
+            </label>
+            <label>Embedding dim
+              <input type="number" name="out_dim" value="128" min="4">
+            </label>
+            <label>Encoder dropout
+              <input type="number" name="encoder_dropout" value="0.1" min="0" max="0.9" step="0.05">
+            </label>
+            <label>GNN dropout
+              <input type="number" name="gnnlayer_dropout" value="0.1" min="0" max="0.9" step="0.05">
+            </label>
+            <label>Learning rate
+              <input type="number" name="lr" value="0.0002" min="0" step="0.0001">
+            </label>
+            <label>Weight decay
+              <input type="number" name="weight_decay" value="0.00005" min="0" step="0.00001">
+            </label>
+            <label>Batch size
+              <input type="number" name="batch_size" value="4" min="1">
+            </label>
+            <label>Epochs
+              <input type="number" name="num_epochs" value="80" min="1">
+            </label>
+            <label>Seed
+              <input type="number" name="seed" value="0">
+            </label>
+            <label>Early stopping
+              <input type="number" name="early_stopping_patience" value="10" min="1">
+            </label>
+            <label>Loss weight H
+              <input type="number" name="loss_weight_H" value="10" min="0" step="0.5">
+            </label>
+            <label>Loss weight C
+              <input type="number" name="loss_weight_C" value="1" min="0" step="0.5">
+            </label>
+            <label class="form-span">Split (train / val / test, by compound)
+              <input type="text" name="split_ratio" value="0.8, 0.1, 0.1">
+            </label>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn" id="btn-train-start">Start training</button>
+            <button type="button" class="btn btn-ghost btn-stop" id="btn-train-stop" disabled>Stop</button>
+          </div>
+          <p class="note" style="margin-top:12px">
+            Training runs on the server (<span id="train-device">…</span>) on the selected dataset,
+            split into train/val/test by compound. The best checkpoint (by validation score) is
+            saved automatically; load it below when done.
+          </p>
+        </form>
+
+        <div class="train-right">
+          <div class="status-card card" id="train-status-card">
+            <h2>Training status</h2>
+            <div class="status-line">
+              <span class="pill idle" id="train-pill">Idle</span>
+              <span id="train-summary" class="note"></span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" id="train-progress" style="width:0%"></div></div>
+            <div class="metrics-row" id="train-metrics"></div>
+          </div>
+
+          <div class="chart-card card">
+            <h2>Loss curves (MAE)</h2>
+            <div class="chart-wrap"><canvas id="loss-chart"></canvas></div>
+          </div>
+
+          <div class="models-card card" id="models-card">
+            <h2>Saved models</h2>
+            <div id="models-table"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toasts"></div>
+
+  <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/state.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/viewer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/explore.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/train.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

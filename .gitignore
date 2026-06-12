@@ -3,7 +3,14 @@ wandb/
 old code/
 __pycache__/
 model/
+.claude/
 
 #files
-__init__.py 
+__init__.py
+
+# web app
+.venv/
+models/
+!app/__init__.py
+!app/services/__init__.py
 

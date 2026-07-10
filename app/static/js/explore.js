@@ -384,7 +384,12 @@ const Explore = {
       return `
         <label>Epochs <input type="number" data-param="epochs" value="100" min="10" max="500"></label>
         <label>Neighborhood (hops) <input type="number" data-param="k_hops" value="2" min="1" max="4"></label>
-        ${expl}`;
+        ${expl}
+        <div class="params-subhead">Regularization (λ)</div>
+        <label title="Edge-mask sparsity — higher keeps fewer edges (more compact subgraph). Effect saturates by ~5.">Edge sparsity <input type="number" data-param="edge_size" value="0.005" min="0" max="100" step="0.001"></label>
+        <label title="Node-feature-mask sparsity — averaged over all features, so its effect stays mild even at high values">Node Feature sparsity <input type="number" data-param="node_feat_size" value="1" min="0" max="100" step="0.1"></label>
+        <label title="Edge-mask entropy — higher pushes edge-mask values toward a crisp 0/1 selection">Edge entropy <input type="number" data-param="edge_ent" value="1" min="0" max="100" step="0.1"></label>
+        <label title="Node-feature-mask entropy — higher pushes feature-mask values toward a crisp 0/1 selection">Node feature entropy <input type="number" data-param="node_feat_ent" value="0.1" min="0" max="100" step="0.05"></label>`;
     }
     return `
       <label>IG steps <input type="number" data-param="n_steps" value="50" min="8" max="128"></label>

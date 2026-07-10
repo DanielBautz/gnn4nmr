@@ -38,7 +38,16 @@ GNN_EXPLAINER_DEFAULTS = {
     "lr": 0.01,
     "explanation_type": "model",
     "k_hops": 2,
+    # Regularization coefficients (PyG GNNExplainer `coeffs`). Higher size
+    # coefficients push toward sparser (more compact) masks; higher entropy
+    # coefficients push mask values toward a crisp 0/1 selection.
+    "edge_size": 0.005,
+    "node_feat_size": 1.0,
+    "edge_ent": 1.0,
+    "node_feat_ent": 0.1,
 }
+# Regularization coefficient keys exposed to the UI, clamped to non-negative.
+GNN_EXPLAINER_COEFFS = ("edge_size", "node_feat_size", "edge_ent", "node_feat_ent")
 IG_DEFAULTS = {
     "n_steps": 50,
     "baseline_type": "zero",
@@ -58,6 +67,8 @@ def normalize_params(method, params):
         merged["lr"] = float(params.get("lr", merged["lr"]))
         merged["explanation_type"] = _expl_type(params)
         merged["k_hops"] = int(_clamp(params.get("k_hops", merged["k_hops"]), 1, 4))
+        for coeff in GNN_EXPLAINER_COEFFS:
+            merged[coeff] = _coeff(params.get(coeff), merged[coeff])
         return merged
     if method == "integrated_gradients":
         merged = {**IG_DEFAULTS}
@@ -82,6 +93,20 @@ def _expl_type(params):
 
 def _clamp(value, lo, hi):
     return max(lo, min(hi, float(value)))
+
+
+def _coeff(value, default):
+    """A non-negative regularization coefficient, falling back to `default`
+    for missing/blank/non-finite input (a cleared number field sends NaN)."""
+    if value is None:
+        return default
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(value):
+        return default
+    return _clamp(value, 0.0, 100.0)
 
 
 def cache_key(state, request):
@@ -237,7 +262,14 @@ def _run_gnn_explainer(adapter, node_type, local_idx, x_dict, edge_index_dict,
     wrapped = NodeTypeRegressionWrapper(adapter, node_type)
     explainer = Explainer(
         model=wrapped,
-        algorithm=GNNExplainer(epochs=params["epochs"], lr=params["lr"]),
+        algorithm=GNNExplainer(
+            epochs=params["epochs"],
+            lr=params["lr"],
+            edge_size=params["edge_size"],
+            node_feat_size=params["node_feat_size"],
+            edge_ent=params["edge_ent"],
+            node_feat_ent=params["node_feat_ent"],
+        ),
         explanation_type=params["explanation_type"],
         model_config=ModelConfig(mode="regression", task_level="node", return_type="raw"),
         node_mask_type="attributes",

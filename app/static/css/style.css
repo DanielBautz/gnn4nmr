@@ -360,6 +360,18 @@ select:focus, input:focus { outline: 2px solid var(--primary-soft); border-color
 
 .params-grid label { font-size: 11px; color: var(--text-soft); display: flex; flex-direction: column; gap: 3px; }
 
+.params-subhead {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
 .param-check { flex-direction: row !important; align-items: center; gap: 6px !important; }
 
 .btn {
